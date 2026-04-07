@@ -1,5 +1,0 @@
-* Loop over each character in a string
-        S = INPUT
-LOOP    S LEN(1) . OUTPUT REM . S        :S(LOOP)
-        INPUT LEN(2) LEN(1) . OUTPUT 
-END    

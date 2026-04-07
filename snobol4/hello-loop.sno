@@ -1,3 +1,0 @@
-* Demonstrate unconditional jumps
-LOOP    OUTPUT = "Hello, world" :(LOOP)
-END

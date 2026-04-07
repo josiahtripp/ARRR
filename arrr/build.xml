@@ -1,0 +1,60 @@
+<?xml version="1.0" ?>
+<project name="lang" default="parser">
+
+	<!-- ANTLR version -->
+	<property name="antlr.version" value="4.5" />
+
+	<!-- ARRR parser -->
+	<target name="arrr-check-parser">
+		<condition property="arrr.parser.uptodate">
+			<and>
+				<uptodate srcfile="src/arrr/ARRR.g" targetfile="src/arrr/parser/ARRRParser.java" />
+				<uptodate srcfile="src/arrr/ARRR.g" targetfile="src/arrr/parser/ARRRLexer.java" />
+				<uptodate srcfile="src/arrr/ARRR.g" targetfile="src/arrr/parser/ARRRListener.java" />
+			</and>
+		</condition>
+	</target>
+
+	<target name="arrr" depends="arrr-check-parser" unless="arrr.parser.uptodate">
+		<java jar="lib/antlr-${antlr.version}-complete.jar" dir="src/arrr/" fork="true" failonerror="true">
+			<arg value="-o" />
+			<arg value="parser/" />
+			<arg value="-no-listener" />
+			<arg value="-package" />
+			<arg value="arrr.parser; import static arrr.AST.*" />
+			<arg value="ARRR.g" />
+		</java>
+	</target>
+
+	<target name="parser" depends="arrr" >
+	</target>
+
+        <target name="compile" depends="parser">
+                <mkdir dir="build/classes"/>
+                <javac srcdir="src" destdir="build/classes">
+                        <classpath>
+                                <pathelement path="lib/antlr-4.5-complete.jar"/>
+                        </classpath>
+                </javac>
+        </target>
+
+        <target name="jar" depends="compile">
+                <mkdir dir="build/jar"/>
+                <jar destfile="build/jar/ARRR.jar" basedir="build/classes">
+                        <zipgroupfileset dir="lib" includes="antlr-4.5-complete.jar" />
+                        <manifest>
+                                <attribute name="Main-Class" value="arrr.Interpreter"/>
+                        </manifest>
+                </jar>
+        </target>
+
+        <target name="run" depends="jar">
+                <java jar="build/jar/ARRR.jar" fork="true"/>
+        </target>
+
+        <target name="clean">
+                <delete dir="build"/>
+        </target>
+
+
+</project>

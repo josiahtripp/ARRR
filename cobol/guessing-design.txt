@@ -1,7 +1,0 @@
-
-                    GUESSING GAME
-
-         Guess: ___
-
-Previous Guess: ___            Guess Count: ___
-                TOO HIGH

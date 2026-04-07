@@ -1,6 +1,0 @@
-        OUTPUT('FILE', 1, , 'numbers.txt')
-        I = 1
-LOOP    FILE = I 
-        I = I + 1
-        LE(I, 10)           :S(LOOP)
-END

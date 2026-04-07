@@ -1,6 +1,0 @@
-    T = TABLE()
-
-    T<"Name"> = "Fred"
-    T<"Phone"> = "555-12345"
-    OUTPUT = T<"Name">
-END

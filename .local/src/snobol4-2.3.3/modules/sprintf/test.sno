@@ -1,5 +1,0 @@
--include 'sprintf.sno'
-
-	output = SPRINTF("%#o", 668)
-	output = SPRINTF("%#x", 4660)
-end

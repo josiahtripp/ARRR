@@ -1,9 +1,0 @@
-* Identify critters in input
-        CRITTERS = "cat" | "bird" | "dog"
-LOOP    OUTPUT = "What is your message?"
-        MSG = INPUT
-        MSG CRITTERS . CRITTER = ""                                 :F(NOCRITTER)
-PRINTC  OUTPUT = "Your message included the critter " CRITTER " :)"   
-        MSG CRITTERS . CRITTER  = ""                                :S(PRINTC) F(LOOP)
-NOCRITTER OUTPUT = "Your message contained no critter :("           :(LOOP)
-END
