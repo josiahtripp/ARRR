@@ -41,12 +41,82 @@ containerSpecifier returns [Type ast] : // The container type of a function para
 		;
 
 typeSpecifier returns [Type ast] : // Types in ARRR
-		'naught' { $ast = new NaughtType(); }
-		| 'tally' { $ast = new TallyType(); }
-		| 'scroll' { $ast = new ScrollType(); }
+		'naught' { $ast = new NaughtType(); } // Void type, only valid for function return type
+		| 'tally' { $ast = new TallyType(); } // Integer type
+		| 'scroll' { $ast = new ScrollType(); } // String type
 		;
 
-// ABOVE THIS LINE IS ALL THAT HAS BEEN IMPLEMENTED FOR ARRR GRAMMAR
+compoundStatement returns [CompoundStatement ast] // A function body, loop body, or selection statement body
+		locals [List<Declaration> decls, List<Statement> stmts]
+		@init { $decls = new ArrayList<Declaration>(); $stmts = new ArrayList<Statement>(); } :
+
+		'{' 
+		( d=declaration { $decls.add($d.ast); } )* // All declarations must come before statements
+		( s=statement { $stmts.add($s.ast) } )*
+		'}'
+		;
+
+declaration returns [Declaration ast] : // A declaration for a variable or an array
+		t=typeSpecifier d=declarator '!' { $ast = new VariableDeclaration($t.ast, $d.ast); }
+		| 'plank' e=expression t=typeSpecifier id=Identifier '!' { $ast = new PlankDeclaration($e.ast, $t.ast, $id.text); }
+		;
+
+declarator returns [Declarator ast] : // Variable declaration or initialization
+		id=Identifier  (  'is' e=expression )? { $ast = new Declarator($id.text, $e != null ? $e.ast : null); }
+		;
+
+expressionList returns [List<Expression> ast]
+		@init { $ast = new ArrayList<Expression>(); } : // Create an array to hold the expressions
+		first=expression { $ast.add($first.ast); } // Evaluate and add the first expression to the list
+		( 'an' next=expression { $ast.add($next.ast); } )* // Evaluate and add the rest of the expressions
+		;
+
+expression returns [Expression ast] :
+		'(' e=expression ')' { $ast = $e.ast; } // Unary operator, parenthesis
+		| 'tisnot' e=expression { $ast = new NegationExpression($e.ast); } // Unary operator, negation
+		| id=Identifier 'at' idx=expression { $ast = new ArrayAccessExpression($id.text, $idx.ast); } // Array access expression
+		| 'fire' id=Identifier ( 'with' args=expressionList )? 
+		  { $ast = FunctionCallExpression($id.text, $args != null ? $args.ast : new ArrayList<Expression>() ); } // Function call expression
+		| func=embeddedFunctionName ( 'with' args=expressionList )?
+		  { $ast = EmbeddedFunctionCallExpression($func.name, $args != null ? $args.ast : new ArrayList<Expression>() ); } // Embedded function call expression
+		| c=Constant { $ast = new ConstantExpression($c.text); } // Integer literal
+		| s=String { $ast = new StringExpression($s.text); } // String literal
+		| id=Identifier { $ast = new VariableExpression($id.text); } // Variable
+		| left=expression op=( 'stack\'em' | 'doleout' | 'dregs' ) right=expression // Multiplicative expression
+		  { $ast = new MultiplicativeExpression($left.ast, $op.text, $right.ast); }
+		| left=expression op=( 'bestow' | 'forkover' )  right=expression // Additive expression
+		  { $ast = new AdditiveExpression($left.ast, $op.text, $right.ast); }
+		| left=expression op=( 'bemorthan' | 'belessthan' ) right=expression // Relational Expression
+		  { $ast = new RelationalExpression($left.ast, $op.text, $right.ast); }
+		| left=expression op=( 'be' | 'benot' ) right=expression // Equality Expression
+		  { $ast = new EqualityExpression($left.ast, $op.text, $right.ast); }
+		| left=expression op=( 'er' | 'n' ) right=expression // Logical OR / AND
+		  { $ast = new LogicalExpression($left.ast, $op.text, $right.ast); }
+		| <assoc=right> id=Identifier 'is' right=expression // Variable assignment expression
+      	  { $ast = new AssignmentExp($id.text, $right.ast); }
+    	| <assoc=right> id=Identifier 'at' idx=expression 'is' right=expression // Array index assignment
+      	  { $ast = new ArrayAssignmentExpression($id.text, $idx.ast, $right.ast); }
+		;
+
+embeddedFunctionName returns [String name] : // Names of embedded functions
+		'yohoho'       { $name = "yohoho"; }
+    	| 'stirthebilge' { $name = "stirthebilge"; }
+    	| 'squawk'       { $name = "squawk"; }
+    	| 'avast\'ye'    { $name = "avast'ye"; }
+    	;
+
+statement returns [Statement ast] :
+		e=expression '!' { $ast = $e.ast; } // Expression statement (assignment, function call, etc)
+		| 'aye' '(' cond=expression ')' cs=compoundStatement ( 'scurvy' scs=compoundStatement )? // If or If/Else
+		  { $ast = new SelectionStatement($cond.ast, $cs.ast, $scs != null ? $scs.ast : null); }
+		| 'in\'voyage' '(' cond=expression ')' cs=compoundStatement // While loop
+		  { $ast = new ConditionalLoopStatement($cond.ast, cs.ast); }
+		| 'fer\'all' '(' ( init=expression )? '!' ( cond=expression )? '!' ( incr=expression )? ')' cs=compoundStatement // For loop
+		  { $ast = new IterativeLoopStatement($init != null ? $init.ast : null, $cond != null ? $cond.ast : null, $incr != null ? $incr.ast : null, $cs.ast); }
+		| 'booty' ( e=expression )? '!' {$ast = $e.ast}
+		;
+
+// BELOW ARE RULES CREATED FOR FuncLang
 
  definedecl returns [DefineDecl ast] :
  		'(' Define 
@@ -237,6 +307,32 @@ typeSpecifier returns [Type ast] : // Types in ARRR
  Naught : 'naught' ;
  Tally : 'tally' ;
  Scroll : 'scroll' ;
+ Is : 'is' ;
+ ExclamationPoint : '!' ;
+ At : 'at' ;
+ Er : 'er' ;
+ N : 'n' ;
+ Be : 'be' ;
+ Benot : 'benot' ;
+ Bemorthan : 'bemorthan' ;
+ Belessthan : 'belessthan' ;
+ Bestow : 'bestow' ;
+ Forkover : 'forkover' ;
+ Stackem : 'stack\'em' ;
+ Doleout : 'doleout' ;
+ Dregs : 'dregs' ;
+ Fire : 'fire' ;
+ Tisnot : 'tisnot' ;
+ Yohoho : 'yohoho' ;
+ Stirthebilge : 'Stirthebilge' ;
+ Squawk : 'squawk' ;
+ Avastye : 'avast\'ye' ;
+ Aye : 'aye' ;
+ Scurvy : 'scurvy' ;
+ Invoyage 'in\'voyage' ;
+ Ferall 'fer\'all' ;
+ Booty 'booty' ;
+
 
  Define : 'define' ;
  Let : 'let' ;
