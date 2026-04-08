@@ -18,6 +18,26 @@ public class Evaluator implements Visitor<Value> {
 	Value valueOf(Program p) {
 			return (Value) p.accept(this, initEnv);
 	}
+
+	Value callVessel(){
+
+		/* main (vessel) call implementation */
+		try{
+			Value vesselVal = initEnv.get("vessel");
+
+			if(vesselVal instanceof Value.FunVal){
+
+				CallExp callVessel = new CallExp(new VarExp("vessel"), new ArrayList<Exp>());
+				return (Value) callVessel.accept(this, initEnv);
+			}
+			return new NumVal(-1);
+
+		} catch (Exception e){
+
+			System.out.println("ARRR! There be no seaworthy vessel in this port! (Program is missing entry point \"vessel\")");
+			return new DynamicError(e.getMessage());
+		}
+	}
 	
 	@Override
 	public Value visit(AddExp e, Env env) {
@@ -75,10 +95,13 @@ public class Evaluator implements Visitor<Value> {
 
 	@Override
 	public Value visit(Program p, Env env) {
+
 		try {
 			for(DefineDecl d: p.decls())
 				d.accept(this, initEnv);
+			
 			return (Value) p.e().accept(this, initEnv);
+
 		} catch (ClassCastException e) {
 			return new DynamicError(e.getMessage());
 		}
@@ -137,7 +160,7 @@ public class Evaluator implements Visitor<Value> {
 	}
 	
 	@Override
-	public Value visit(CallExp e, Env env) { // New for .
+	public Value visit(CallExp e, Env env) {
 		Object result = e.operator().accept(this, env);
 		if(!(result instanceof Value.FunVal))
 			return new Value.DynamicError("Operator not a function in call " +  ts.visit(e, env));

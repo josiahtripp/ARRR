@@ -14,7 +14,6 @@ import arrr.AST.*;
  */
 public class Interpreter {
 	public static void main(String[] args) {
-		System.out.println("Ahoy Matey! ARRR!");
 		
 		Reader reader;
 		if(args.length == 0) {
@@ -33,6 +32,7 @@ public class Interpreter {
 
 		Evaluator eval = new Evaluator(reader);
 		Printer printer = new Printer();
+		Value vesselVal;
 		REPL: while (true) { // Read-Eval-Print-Loop (also known as REPL)
 			Program p = null;
 			try {
@@ -41,6 +41,8 @@ public class Interpreter {
 				if(p._e instanceof AST.UnitExp) {
 					
 					// End of file. Time to call the main function!
+					vesselVal = eval.callVessel();
+					printer.print(vesselVal);
 					
 					return;
 				}

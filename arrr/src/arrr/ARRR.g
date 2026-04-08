@@ -1,11 +1,52 @@
 grammar ARRR;
  
- program returns [Program ast]        
- 		locals [ArrayList<DefineDecl> defs, Exp expr]
- 		@init { $defs = new ArrayList<DefineDecl>(); $expr = new UnitExp(); } :
-		(def=definedecl { $defs.add($def.ast); } )* (e=exp { $expr = $e.ast; } )? 
-		{ $ast = new Program($defs, $expr); }
+ program returns [Program ast]
+ 		locals [ArrayList<ExternalDeclaration> decls] // Local variables within the parser (keeps track of global variables and function definitions)
+ 		@init { $decls = new ArrayList<ExternalDeclaration>(); } : // Initilization code run for the parser (Creates the array to hold external declarations)
+
+		(ext=externalDeclaration { $decls.add($ext.ast); } )* // A program consists of 0 or more external declarations, add each to the array.
+
+		{ $ast = new Program($decls); } // Finally, evaluate the program using the array of external declarations.
 		;
+
+externalDeclaration returns [ExternalDeclaration ast] : // An external declaration is either a global declaration or a function definition
+		func=functionDefinition { $ast = $func.ast; } // Function definition
+		| var=declaration { $ast = $var.ast; } // Global variable declaration
+		;
+
+functionDefinition returns [FunctionDefinition ast] : // This can only be one thing, and must be written only one way
+		'canon' id=Identifier 'fires' type=containerSpecifier params=parameterTypeList body=compoundStatement
+
+		{ $ast = new FunctionDefinition($id.text, $type.ast, $params.ast, $body.ast); }
+		;
+
+parameterTypeList returns [List<ParameterDeclaration> ast] // List of parameters for a function (0 or more)
+		@init { $ast = new ArrayList<ParameterDeclaration>(); } : // Create an array to hold an empty parameter list (returned when there are no parameters)
+		( 'with' pl=parameterList { $ast = $pl.ast; } )? // Otherwise, use the list provided by the parameterList rule
+		;
+
+parameterList returns [List<ParameterDeclaration> ast] // List of parameters for a function (1 or more)
+		@init { $ast = new ArrayList<ParameterDeclaration>(); } : // Create an array to hold the parameter declarations
+		first=parameterDeclaration { $ast.add($first.ast); } // Evaluate and add the first parameter declaration to the list
+		( 'an' next=parameterDeclaration { $ast.add($next.ast); } )* // Evaluate and add the rest of the parameters
+		;
+
+parameterDeclaration returns [ParameterDeclaration ast] : // A function parameter declaration
+		type=containerSpecifier id=Identifier { $ast = new ParameterDeclaration($type.ast, $id.text); } // Create the object to be added to the array list
+		;
+
+containerSpecifier returns [Type ast] : // The container type of a function parameter declaration
+		t=typeSpecifier { $ast = $t.ast; } // Just a basic variable type
+		| 'plank' t=typeSpecifier { $ast = new PlankType($t.ast); } // An array type
+		;
+
+typeSpecifier returns [Type ast] : // Types in ARRR
+		'naught' { $ast = new NaughtType(); }
+		| 'tally' { $ast = new TallyType(); }
+		| 'scroll' { $ast = new ScrollType(); }
+		;
+
+// ABOVE THIS LINE IS ALL THAT HAS BEEN IMPLEMENTED FOR ARRR GRAMMAR
 
  definedecl returns [DefineDecl ast] :
  		'(' Define 
@@ -188,7 +229,15 @@ grammar ARRR;
 
  // Lexical Specification of this Programming Language
  //  - lexical specification rules start with uppercase
- 
+ Canon : 'canon' ;
+ Fires : 'fires' ;
+ With  : 'with' ;
+ An    : 'an' ;
+ Plank : 'plank' ;
+ Naught : 'naught' ;
+ Tally : 'tally' ;
+ Scroll : 'scroll' ;
+
  Define : 'define' ;
  Let : 'let' ;
  Dot : '.' ;
