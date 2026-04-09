@@ -1,34 +1,45 @@
 package arrr;
 
+import java.beans.Expression;
 import java.util.ArrayList;
 import java.util.List;
 
+import arrr.AST.ASTNode;
+import arrr.AST.BinaryComparator;
+import arrr.AST.BinaryExpression;
+import arrr.AST.CompoundArithExp;
+import arrr.AST.CompoundStatement;
+import arrr.AST.Declaration;
+import arrr.AST.Declarator;
+import arrr.AST.ExternalDeclaration;
+import arrr.AST.ParameterDeclaration;
+import arrr.AST.StringType;
+import arrr.AST.TallyType;
+import arrr.AST.UnaryExp;
+import arrr.AST.UnaryExpression;
+import arrr.AST.VoidType;
+
 
 /**
- * This class hierarchy represents expressions in the abstract syntax tree
- * manipulated by this interpreter.
+ * This class hierarchy represents a program and its derivations manipulated by this interpreter.
  * 
  * @author Josiah Tripp
  * 
  */
 public interface AST {
+
 	public static abstract class ASTNode implements AST {
 		public abstract <T> T accept(Visitor<T> visitor, Env env);
 	}
+
 	public static class Program extends ASTNode {
-		List<DefineDecl> _decls;
-		Exp _e;
+		List<ExternalDeclaration> _decls;
 
-		public Program(List<DefineDecl>decls, Exp e) {
+		public Program(List<ExternalDeclaration> decls) {
 			_decls = decls;
-			_e = e;
-		}
-
-		public Exp e() {
-			return _e;
 		}
 		
-		public List<DefineDecl> decls() {
+		public List<ExternalDeclaration> decls() {
 			return _decls;
 		}
 		
@@ -36,21 +47,682 @@ public interface AST {
 			return visitor.visit(this, env);
 		}
 	}
-	public static abstract class Exp extends ASTNode {
+
+	public static abstract class ExternalDeclaration extends ASTNode {
 
 	}
 
-	public static class VarExp extends Exp {
-		String _name;
+	public static class FunctionDefinition extends ExternalDeclaration {
+		String _id;
+		Type _type;
+		List<ParameterDeclaration> _params;
+		CompoundStatement _body;
 
-		public VarExp(String name) {
-			_name = name;
+		public FunctionDefinition(String id, Type type, List<ParameterDeclaration> params, CompoundStatement body) {
+			_id = id;
+			_type = type;
+			_params = params;
+			_body = body;
 		}
 
-		public String name() {
-			return _name;
+		public String id() {
+			return _id;
+		}
+
+		public ContainerSpecifier type() {
+			return _type;
+		}
+
+		public List<ExternalDeclaration> params() {
+			return _params;
+		}
+
+		public CompoundStatement body(){
+			return _body;
 		}
 		
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class ParameterDeclaration extends ASTNode {
+		Type _type;
+		String _id;
+
+		public ParameterDeclaration(Type _type, String id) {
+			_type = type;
+			_id = id;
+		}
+
+		public String id() {
+			return _id;
+		}
+
+		public ContainerSpecifier type(){
+			return _type;
+		}
+		
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+	/*
+	public abstract static class Type extends ASTNode {
+        public abstract boolean equals(Object obj);
+    }
+
+	public static class IntegerType extends Type {
+
+		public TallyType(){
+
+		}
+
+		public boolean equals(Object obj) {
+			return obj instanceof TallyType;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class StringType extends Type {
+
+		public StringType(){
+
+		}
+
+		public boolean equals(Object obj) {
+			return obj instanceof StringType;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class VoidType extends Type {
+
+		public VoidType(){
+
+		}
+
+		public boolean equals(Object obj) {
+			return obj instanceof VoidType;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class ArrayType extends Type {
+		Type _innerType;
+
+		public PlankType(Type innerType){
+			_innerType = innerType;
+		}
+
+		public Type innerType(){
+			return _innerType;
+		}
+
+		public boolean equals(Object obj){
+			if (obj instanceof ArrayType) {
+				return this._innerType.equals(((ArrayType) obj).innerType());
+			}
+			return false;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env){
+			return visitor.visit(this, env);
+		}
+	}
+	*/
+	public static class CompoundStatement extends ASTNode {
+		List<Declaration> _decls;
+		List<Statements> _stmts;
+
+		public CompoundStatement(List<Declaration> decls, List<Statements> stmts){
+			_decls = decls;
+			_stmts = stmts;
+		}
+
+		public List<Declaration> decls(){
+			return _decls;
+		}
+
+		public List<Statement> stmts(){
+			return _stmts;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static abstract class Declaration extends ExternalDeclaration {
+
+	}
+
+	public static class VariableDeclaration extends Declaration {
+		Type _type;
+		Declarator _decl;
+
+		public VariableDeclaration(Type type, Declarator decl) {
+			_type = type;
+			decl = _decl;
+		}
+
+		public TypeSpecifier type() {
+			return _type;
+		}
+
+		public Declarator decl() {
+			return _decl;
+		}
+		
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class ArrayDeclaration extends Declaration {
+		Expression _exp;
+		Type _type;
+		String _id;
+
+		public ArrayDeclaration(Expression exp, Type type, String id) {
+			_exp = exp;
+			_type = type;
+			_id = id;
+		}
+
+		public Expression exp(){
+			return _exp;
+		}
+
+		public TypeSpecifier type() {
+			return _type;
+		}
+
+		public String id() {
+			return _id;
+		}
+		
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class Declarator extends ASTNode {
+		String _id;
+		Expression _exp;
+
+		public Declarator(String id, Expresion exp){
+			_id = id;
+			_exp = exp;
+		}
+
+		public String id(){
+			return _id;
+		}
+
+		public Expression exp(){
+			return _exp;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static abstract class Expression extends ASTNode {
+
+	}
+
+	public static abstract class UnaryExpression extends Expression {
+		Expression _exp;
+
+		public UnaryExp(Expression exp) {
+			_exp = exp;
+		}
+
+		public Exp getExp() {
+			return _exp;
+		}
+	}
+
+	public static class NegationExpression extends UnaryExpression {
+
+		public NegationExpression(Expression exp){
+			super(exp);
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class ArrayAccessExpression extends Expression {
+		String _id;
+		Expression _idx;
+
+		public ArrayAccessExpression(String id, Expression idx){
+			_id = id;
+			_idx = idx;
+		}
+
+		public String id(){
+			return _id;
+		}
+
+		public Expression idx(){
+			return _idx;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class FunctionCallExpression extends Expression {
+		String _id;
+		List<Expression> _args;
+
+		public FunctionCallExpression(String id, List<Expression> args){
+			_id = id;
+			_args = args;
+		}
+
+		public String id(){
+			return _id;
+		}
+
+		public List<Expression> args(){
+			return _args;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class EmbeddedFunctionCallExpression extends Expression {
+		String _name;
+		List<Expression> _args;
+
+		public EmbeddedFunctionCallExpression(String id, List<Expression> args){
+			_name = name;
+			_args = args;
+		}
+
+		public String name(){
+			return _name;
+		}
+
+		public List<Expression> args(){
+			return _args;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class ConstantExpression extends Expression {
+		private int _val;
+
+		public ConstantExpression(int val){
+			_val = val;
+		}
+
+		public int val(){
+			return _val;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class StringExpression extends Expression {
+		private String _str;
+
+		public StringExpression(String val){
+			_str = str.substring(1, str.length() - 1);
+		}
+
+		public String str(){
+			return _str;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class VariableExpression extends Expression {
+		String _id;
+
+		public VariableExpression(String id){
+			_id = id;
+		}
+
+		public String id(){
+			return _id;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static abstract class BinaryExpression extends Expression {
+		Expression _left;
+		Expression _right;
+
+		public BinaryExpression(Expression left, Expression right) {
+			_left  = left;
+			_right = right;
+		}
+
+		public Expression getLeft() {
+			return _left;
+		}
+
+		public Expression getRight() {
+			return _right;
+		}
+	}
+
+	public static class MultiplicationExpression extends BinaryExpression {
+
+		public MultiplicationExpression(Expression left, Expression right){
+			super(left, right);
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class DivisionExpression extends BinaryExpression {
+
+		public DivisionExpression(Expression left, Expression right){
+			super(left, right);
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class ModuloExpression extends BinaryExpression {
+
+		public ModuloExpression(Expression left, Expression right){
+			super(left, right);
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class AdditionExpression extends BinaryExpression {
+
+		public AdditionExpression(Expression left, Expression right){
+			super(left, right);
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class SubtractionExpression extends BinaryExpression {
+
+		public SubtractionExpression(Expression left, Expression right){
+			super(left, right);
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+	
+	public static class GreaterthanExpression extends BinaryExpression {
+
+		public GreaterthanExpression(Expression left, Expression right){
+			super(left, right);
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class LessthanExpression extends BinaryExpression {
+
+		public LessthanExpression(Expression left, Expression right){
+			super(left, right);
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class EqualityExpression extends BinaryExpression {
+
+		public EqualityExpression(Expression left, Expression right){
+			super(left, right);
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class InequalityExpression extends BinaryExpression {
+
+		public InequalityExpression(Expression left, Expression right){
+			super(left, right);
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class LogicalOrExpression extends BinaryExpression {
+
+		public LogicalOrExpression(Expression left, Expression right){
+			super(left, right);
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class LogicalAndExpression extends BinaryExpression {
+
+		public LogicalAndExpression(Expression left, Expression right){
+			super(left, right);
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class VariableAssignmentExpression extends Expression {
+		String _id;
+		Expression _exp;
+
+		public VariableAssignmentExpression(String id, Expression exp){
+			_id = id;
+			_exp = exp;
+		}
+
+		public String id(){
+			return _id;
+		}
+
+		public Expression exp(){
+			return _exp;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class ArrayAssignmentExpression extends Expression {
+		String _id;
+		Expression _idx;
+		Expression _exp;
+
+		public ArrayAssignmentExpression(String id, Expression idx, Expression exp){
+			_id = id;
+			_idx = idx;
+			_exp = exp;
+		}
+
+		public String id(){
+			return _id;
+		}
+
+		public Expression idx(){
+			return _idx;
+		}
+
+		public Expression exp(){
+			return _exp;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static abstract class Statement extends ASTNode {
+
+	}
+
+	public static class ExpressionStatement extends Statement {
+		Expression _exp;
+
+		public ExpressionStatement(Expression exp){
+			_exp = exp;
+		}
+
+		public Expression exp(){
+			return _exp;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class SelectionStatement extends Statement {
+		Expression _cond;
+		CompoundStatement _tbody;
+		ComoundStatement _fbody;
+
+		public SelectionStatement(Expression cond, CompoundStatement tbody, CompoundStatement fbody){
+			_cond = cond;
+			_tbody = tbody;
+			_fbody = fbody;
+		}
+
+		public Expression cond(){
+			return _cond;
+		}
+
+		public CompoundStatement tbody(){
+			return _tbody;
+		}
+
+		public CompoundStatement fbody(){
+			return _fbody;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class ConditionalLoopStatement extends Statement {
+		Expression _cond;
+		CompoundStatement _body;
+
+		public ConditionalLoopStatement(Expression cond, CompoundStatement body){
+			_cond = cond;
+			_body = body;
+		}
+
+		public Expression cond(){
+			return _cond;
+		}
+
+		public CompoundStatement body(){
+			return _body;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class IterativeLoopStatement extends Statement {
+		Expression _init;
+		Expression _cond;
+		Expression _incr;
+		CompoundStatement _body;
+
+		public IterativeLoopStatement(Expression init, Expression cond, Expression incr, CompoundStatement body){
+			_init = init;
+			_cond = cond;
+			_incr = incr;
+			_body = body;
+		}
+
+		public Expression init(){
+			return _init;
+		}
+
+		public Expression cond(){
+			return _cond;
+		}
+
+		public Expression incr(){
+			return _incr;
+		}
+
+		public CompoundStatement body(){
+			return _body;
+		}
+
+		public <T> T accept(Visitor<T> visitor, Env env) {
+			return visitor.visit(this, env);
+		}
+	}
+
+	public static class ReturnStatement extends Statement {
+		Expression _exp;
+
+		public ReturnStatement(Expression exp){
+			_exp = exp;
+		}
+
+		public Expression exp(){
+			return _exp;
+		}
+
 		public <T> T accept(Visitor<T> visitor, Env env) {
 			return visitor.visit(this, env);
 		}
@@ -63,7 +735,6 @@ public interface AST {
 		public <T> T accept(Visitor<T> visitor, Env env) {
 			return visitor.visit(this, env);
 		}
-
 	}
 
 	public static class NumExp extends Exp {
@@ -581,31 +1252,37 @@ public interface AST {
 	}
 	
 	public interface Visitor <T> {
-		// This interface should contain a signature for each concrete AST node.
-		public T visit(AST.AddExp e, Env env);
-		public T visit(AST.UnitExp e, Env env);
-		public T visit(AST.NumExp e, Env env);
-		public T visit(AST.StrExp e, Env env);
-		public T visit(AST.BoolExp e, Env env);
-		public T visit(AST.DivExp e, Env env);
-		public T visit(AST.MultExp e, Env env);
-		public T visit(AST.Program p, Env env);
-		public T visit(AST.SubExp e, Env env);
-		public T visit(AST.VarExp e, Env env);
-		public T visit(AST.LetExp e, Env env); // New for the varlang
-		public T visit(AST.DefineDecl d, Env env); // New for the definelang
-		public T visit(AST.ReadExp e, Env env); // New for the
-		public T visit(AST.EvalExp e, Env env); // New for the
-		public T visit(AST.LambdaExp e, Env env); // New for the
-		public T visit(AST.CallExp e, Env env); // New for the
-		public T visit(AST.IfExp e, Env env); // Additional expressions for convenience
-		public T visit(AST.LessExp e, Env env); // Additional expressions for convenience
-		public T visit(AST.EqualExp e, Env env); // Additional expressions for convenience
-		public T visit(AST.GreaterExp e, Env env); // Additional expressions for convenience
-		public T visit(AST.CarExp e, Env env); // Additional expressions for convenience
-		public T visit(AST.CdrExp e, Env env); // Additional expressions for convenience
-		public T visit(AST.ConsExp e, Env env); // Additional expressions for convenience
-		public T visit(AST.ListExp e, Env env); // Additional expressions for convenience
-		public T visit(AST.NullExp e, Env env); // Additional expressions for convenience
+		public T visit(AST.Program e, Env env);
+		public T visit(AST.FunctionDefinition e, Env env);
+		public T visit(AST.ParameterDeclaration e, Env env);
+		public T visit(AST.CompoundStatement e, Env env);
+		public T visit(AST.VariableDeclaration e, Env env);
+		public T visit(AST.ArrayDeclaration e, Env env);
+		public T visit(AST.Declarator e, Env env);
+		public T visit(AST.NegationExpression p, Env env); // Should always return 1 or 0
+		public T visit(AST.ArrayAccessExpression e, Env env); // Should always return an integer or string
+		public T visit(AST.FunctionCallExpression e, Env env); // Should always return the return type of the function
+		public T visit(AST.EmbeddedFunctionCallExpression e, Env env); // Should always return the return type of the embedded function
+		public T visit(AST.ConstantExpression d, Env env); // Should always return an integer
+		public T visit(AST.StringExpression e, Env env); // Should always return a string
+		public T visit(AST.VariableExpression e, Env env); // Should always return an integer, string, or plank (reference)
+		public T visit(AST.MultiplicationExpression e, Env env); // Should always return an integer
+		public T visit(AST.DivisionExpression e, Env env); // Should always return an integer
+		public T visit(AST.ModuloExpression e, Env env); // Should always an integer
+		public T visit(AST.AdditionExpression e, Env env); // Should always return an integer or a string
+		public T visit(AST.SubtractionExpression e, Env env); // Should always return an integer
+		public T visit(AST.GreaterthanExpression e, Env env); // Should always return 1 or 0
+		public T visit(AST.LessthanExpression e, Env env); // Should always return 1 or 0
+		public T visit(AST.EqualityExpression e, Env env); // Should always return 1 or 0
+		public T visit(AST.InequalityExpression e, Env env); // Should always return 1 or 0
+		public T visit(AST.LogicalOrExpression e, Env env); // Should always return 1 or 0
+		public T visit(AST.LogicalAndExpression e, Env env); // Should always return 1 or 0 
+		public T visit(AST.VariableAssignmentExpression e, Env env); // Should always return the value assigned
+		public T visit(AST.ArrayAssignmentExpression e, Env env); // Should always return the value assigned
+		public T visit(AST.ExpressionStatement e, Env env); // Should not return anything (evaluate expression)
+		public T visit(AST.SelectionStatement e, Env env); // Should not return anything
+		public T visit(AST.ConditionalLoopStatement e, Env env); // Should not return anything
+		public T visit(AST.IterativeLoopStatement e, Env env); // Should not return anything
+		public T visit(AST.ReturnStatement e, Env env); // Should not return anything (evaluate expression)
 	}	
 }

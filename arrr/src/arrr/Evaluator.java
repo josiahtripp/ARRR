@@ -7,7 +7,40 @@ import java.util.ArrayList;
 import java.io.File;
 import java.io.IOException;
 
+import arrr.AST.AddExp;
+import arrr.AST.BoolExp;
+import arrr.AST.CallExp;
+import arrr.AST.CarExp;
+import arrr.AST.CdrExp;
+import arrr.AST.ConsExp;
+import arrr.AST.DefineDecl;
+import arrr.AST.DivExp;
+import arrr.AST.EqualExp;
+import arrr.AST.EvalExp;
+import arrr.AST.GreaterExp;
+import arrr.AST.IfExp;
+import arrr.AST.LambdaExp;
+import arrr.AST.LessExp;
+import arrr.AST.LetExp;
+import arrr.AST.ListExp;
+import arrr.AST.MultExp;
+import arrr.AST.NullExp;
+import arrr.AST.NumExp;
+import arrr.AST.Program;
+import arrr.AST.ReadExp;
+import arrr.AST.StrExp;
+import arrr.AST.SubExp;
+import arrr.AST.UnitExp;
+import arrr.AST.Visitor;
 import arrr.Env.*;
+import arrr.Type.IntegerType;
+import arrr.Type.StringType;
+import arrr.Value.BoolVal;
+import arrr.Value.DynamicError;
+import arrr.Value.NumVal;
+import arrr.Value.PairVal;
+import arrr.Value.StringVal;
+import arrr.Value.UnitVal;
 
 public class Evaluator implements Visitor<Value> {
 	
@@ -38,6 +71,117 @@ public class Evaluator implements Visitor<Value> {
 			return new DynamicError(e.getMessage());
 		}
 	}
+
+	@override
+	public T visit(AST.Program e, Env env){
+
+	}
+
+	public T visit(AST.FunctionDefinition e, Env env);
+	public T visit(AST.ParameterDeclaration e, Env env);
+	public T visit(AST.CompoundStatement e, Env env);
+	public T visit(AST.VariableDeclaration e, Env env);
+	public T visit(AST.ArrayDeclaration e, Env env);
+	public T visit(AST.Declarator e, Env env);
+	public T visit(AST.NegationExpression p, Env env); // Should always return 1 or 0
+	public T visit(AST.ArrayAccessExpression e, Env env); // Should always return an integer or string
+	public T visit(AST.FunctionCallExpression e, Env env); // Should always return the return type of the function
+	public T visit(AST.EmbeddedFunctionCallExpression e, Env env); // Should always return the return type of the embedded function
+
+	@Override
+	public Type visit(AST.ConstantExpression e, Env env){
+		return new IntegerType(e.val());
+	}
+
+	@Override
+	public T visit(AST.StringExpression e, Env env);{
+		return new StringType(e.str());
+	}
+	
+	public T visit(AST.VariableExpression e, Env env); // Should always return an integer, string, or plank (reference)
+
+	@Override
+	public T visit(AST.MultiplicationExpression e, Env env){
+
+		// Evaluate the left and right expressions (Must be IntegerType)
+		int left = ((IntegerType) e.getLeft().accept(this)).val();
+		int right = ((IntegerType) e.getRight().accept(this)).val();
+
+		// Calculate the result
+		int result = left * right;
+
+		return new IntegerType(result);
+	}
+
+	@Override
+	public T visit(AST.DivisionExpression e, Env env){
+
+		// Evaluate the left and right expressions (Must be IntegerType)
+		int left = ((IntegerType) e.getLeft().accept(this)).val();
+		int right = ((IntegerType) e.getRight().accept(this)).val();
+
+		// Calculate the result
+		int result = left / right;
+
+		return new IntegerType(result);
+	}
+
+	@Override
+	public T visit(AST.ModuloExpression e, Env env){
+
+		// Evaluate the left and right expressions (Must be IntegerType)
+		int left = ((IntegerType) e.getLeft().accept(this)).val();
+		int right = ((IntegerType) e.getRight().accept(this)).val();
+
+		// Calculate the result
+		int result = left % right;
+
+		return new IntegerType(result);
+	}
+
+	@Override
+	public T visit(AST.AdditionExpression e, Env env){
+
+		// Evaluate the left and right expression and retrive types
+		T left_t = e.getRight().accept(this);
+		T right_t = e.getRight().accept(this);
+
+		// Both expressions are integers, cast to IntegerType and retrieve values
+		int left = ((IntegerType) left_t).val();
+		int right = ((IntegerType) right_t).val();
+
+		// Calculate the result
+		int result = left + right;
+
+		return new IntegerType(result);
+	}
+
+	@Override
+	public T visit(AST.SubtractionExpression e, Env env){
+
+		// Evaluate the left and right expressions (Must be IntegerType)
+		int left = ((IntegerType) e.getLeft().accept(this)).val();
+		int right = ((IntegerType) e.getRight().accept(this)).val();
+
+		// Calculate the result
+		int result = left - right;
+
+		return new IntegerType(result);
+	}
+
+	public T visit(AST.GreaterthanExpression e, Env env); // Should always return 1 or 0
+	public T visit(AST.LessthanExpression e, Env env); // Should always return 1 or 0
+	public T visit(AST.EqualityExpression e, Env env); // Should always return 1 or 0
+	public T visit(AST.InequalityExpression e, Env env); // Should always return 1 or 0
+	public T visit(AST.LogicalOrExpression e, Env env); // Should always return 1 or 0
+	public T visit(AST.LogicalAndExpression e, Env env); // Should always return 1 or 0 
+	public T visit(AST.VariableAssignmentExpression e, Env env); // Should always return the value assigned
+	public T visit(AST.ArrayAssignmentExpression e, Env env); // Should always return the value assigned
+	public T visit(AST.ExpressionStatement e, Env env); // Should not return anything (evaluate expression)
+	public T visit(AST.SelectionStatement e, Env env); // Should not return anything
+	public T visit(AST.ConditionalLoopStatement e, Env env); // Should not return anything
+	public T visit(AST.IterativeLoopStatement e, Env env); // Should not return anything
+	public T visit(AST.ReturnStatement e, Env env); // Should not return anything (evaluate expression)
 	
 	@Override
 	public Value visit(AddExp e, Env env) {

@@ -17,7 +17,7 @@ externalDeclaration returns [ExternalDeclaration ast] : // An external declarati
 functionDefinition returns [FunctionDefinition ast] :
 		'canon' id=Identifier 'fires' type=containerSpecifier params=parameterTypeList body=compoundStatement
 
-		{ $ast = new FunctionDefinition($id.text, $type.ast, $params.ast, $body.ast); }
+		{ $ast = new FunctionDefinition($id.text, $type.type, $params.ast, $body.ast); }
 		;
 
 parameterTypeList returns [List<ParameterDeclaration> ast]        // ArrayList of function parameters (0 or more)
@@ -33,40 +33,41 @@ parameterList returns [List<ParameterDeclaration> ast]               // ArrayLis
 
 parameterDeclaration returns [ParameterDeclaration ast] :         // A function parameter AST
 		type=containerSpecifier id=Identifier                     // Capture the parameter type and name
-		{ $ast = new ParameterDeclaration($type.ast, $id.text); } // Create the parameter and return it
+		{ $ast = new ParameterDeclaration($type.type, $id.text); } // Create the parameter and return it
 		;
 
-containerSpecifier returns [Type ast] :                             // The container type of a function parameter
-		t=typeSpecifier { $ast = $t.ast; }                          // A variable parameter
-		| 'plank' t=typeSpecifier { $ast = new PlankType($t.ast); } // An array parameter
+containerSpecifier returns [Type type] :                                   // The container type of a function parameter
+		type=typeSpecifier { $type = $type.type; }                          // A variable parameter
+		| 'plank' type=typeSpecifier { $type = new PlankType($type.type); } // An array parameter
 		;
 
-typeSpecifier returns [Type ast] :              // Variable and array types
-		'naught' { $ast = new NaughtType(); }   // Void type, only valid for function return type
-		| 'tally' { $ast = new TallyType(); }   // Integer type
-		| 'scroll' { $ast = new ScrollType(); } // String type
+typeSpecifier returns [Type type] :              // Variable and array types
+		'naught' { $type = new VoidType(); }   // Void type, only valid for function return type
+		| 'tally' { $type = new IntegerType(); }   // Integer type
+		| 'scroll' { $type = new StringType(); } // String type
 		;
 
 compoundStatement returns [CompoundStatement ast]                                               // A function, loop, or selection statement body
 		locals [List<Declaration> decls, List<Statement> stmts]                                 // ArrayList of declarations and statements (all contents)
 		@init { $decls = new ArrayList<Declaration>(); $stmts = new ArrayList<Statement>(); } :
 
-		'{' 																					// *All declarations must come before statements
-		( d=declaration { $decls.add($d.ast); } )*                                              // Declaration, add to its ArrayList
-		( s=statement { $stmts.add($s.ast) } )*                                                 // Statement, add to its ArrayList
+		'{'          																			 // *All declarations must come before statements
+		( d=declaration { $decls.add($d.ast); } )*                                               // Declaration, add to its ArrayList
+		( s=statement { $stmts.add($s.ast); } )*                                                 // Statement, add to its ArrayList
 		'}'
+		{ $ast = new CompoundStatement($decls, $stmts); }
 		;
 
-declaration returns [Declaration ast] :                                                      // A declaration for a variable or an array
-		t=typeSpecifier d=declarator '!'                                                     // Variable
-		  { $ast = new VariableDeclaration($t.ast, $d.ast); }
-		| 'plank' e=expression t=typeSpecifier id=Identifier '!'                             // Array
-		  { $ast = new PlankDeclaration($e.ast, $t.ast, $id.text); }
+declaration returns [Declaration ast] :                                                               // A declaration for a variable or an array
+		type=typeSpecifier decl=declarator '!'                                                     // Variable
+		  { $ast = new VariableDeclaration($type.ast, $decl.ast); }
+		| 'plank' exp=expression type=typeSpecifier id=Identifier '!'                                      // Array
+		  { $ast = new PlankDeclaration($exp.ast, $type.ast, $id.text); }
 		;
 
 declarator returns [Declarator ast] :                                    // Variable declaration or initialization
-		id=Identifier  (  'is' e=expression )?                           // Check if variable has initializer expression
-		{ $ast = new Declarator($id.text, $e != null ? $e.ast : null); } // Return with initializer AST if present
+		id=Identifier  (  'is' exp=expression )?                           // Check if variable has initializer expression
+		{ $ast = new Declarator($id.text, $exp != null ? $exp.ast : null); } // Return with initializer AST if present
 		;
 
 expressionList returns [List<Expression> ast]              // List of expressions for a function call
@@ -76,48 +77,67 @@ expressionList returns [List<Expression> ast]              // List of expression
 		;
 
 expression returns [Expression ast] :                                                                                      // Order defined order of operations
-		'(' e=expression ')' { $ast = $e.ast; }                                                                            // Unary operator, parenthesis: ()
-		| 'tisnot' e=expression { $ast = new NegationExpression($e.ast); }                                                 // Unary operator, negation: !
+		'(' exp=expression ')' { $ast = $exp.ast; }                                                                            // Unary operator, parenthesis: ()
+		| 'tisnot' exp=expression { $ast = new NegationExpression($exp.ast); }                                                 // Unary operator, negation: !
 		| id=Identifier 'at' idx=expression { $ast = new ArrayAccessExpression($id.text, $idx.ast); }                      // Array element access: [i]
 		| 'fire' id=Identifier ( 'with' args=expressionList )? 
 		  { $ast = FunctionCallExpression($id.text, $args != null ? $args.ast : new ArrayList<Expression>() ); }           // Function call
-		| func=embeddedFunctionName ( 'with' args=expressionList )?
+		| func=() ( 'with' args=expressionList )?
 		  { $ast = EmbeddedFunctionCallExpression($func.name, $args != null ? $args.ast : new ArrayList<Expression>() ); } // Embedded function
-		| c=Constant { $ast = new ConstantExpression($c.text); }                                                           // Integer literal: 12345
-		| s=String { $ast = new StringExpression($s.text); }                                                               // String literal: "abcdef"
+		| c=constantExpression { $ast = $c.ast; }                                                           // Integer literal: 12345
+		| s=stringExpression { $ast = $s.ast; }                                                               // String literal: "abcdef"
 		| id=Identifier { $ast = new VariableExpression($id.text); }                                                       // Variable access: n
-		| left=expression op=( 'stack\'em' | 'doleout' | 'dregs' ) right=expression                                        // Multiplicative expression: * / %
-		  { $ast = new MultiplicativeExpression($left.ast, $op.text, $right.ast); }
-		| left=expression op=( 'bestow' | 'forkover' )  right=expression                                                   // Additive expression: + -
-		  { $ast = new AdditiveExpression($left.ast, $op.text, $right.ast); }
-		| left=expression op=( 'bemorthan' | 'belessthan' ) right=expression                                               // Relational Expression: < >
-		  { $ast = new RelationalExpression($left.ast, $op.text, $right.ast); }
-		| left=expression op=( 'be' | 'benot' ) right=expression                                                           // Equality Expression: == !=
-		  { $ast = new EqualityExpression($left.ast, $op.text, $right.ast); }
-		| left=expression op=( 'er' | 'n' ) right=expression                                                               // Logical Expression: || &&
-		  { $ast = new LogicalExpression($left.ast, $op.text, $right.ast); }
+		| left=expression 'stack\'em' right=expression                                        // Multiplication expression: *
+		  { $ast = new MultiplicationExpression($left.ast, $right.ast); }
+		| left=expression 'doleout' right=expression                                        // Division expression: /
+		  { $ast = new DivisionExpression($left.ast, $right.ast); }
+		| left=expression 'dregs' right=expression                                        // Modulo Expression: %
+		  { $ast = new ModuloExpression($left.ast, $right.ast); }
+		| left=expression 'bestow' right=expression                                                   // Addition expression: +
+		  { $ast = new AdditionExpression($left.ast, $right.ast); }
+		| left=expression 'forkover' right=expression                                                   // Subtraction expression: -
+		  { $ast = new SubtractionExpression($left.ast, $right.ast); }
+		| left=expression 'bemorthan' right=expression                                               // Greaterthan Expression: >
+		  { $ast = new GreaterthanExpression($left.ast, $right.ast); }
+		| left=expression 'belessthan' right=expression                                               // Lessthan Expression: <
+		  { $ast = new LessthanExpression($left.ast, $right.ast); }
+		| left=expression 'be' right=expression                                                           // Equality Expression: ==
+		  { $ast = new EqualityExpression($left.ast, $right.ast); }
+		| left=expression 'benot' right=expression                                                           // Inequality Expression: !=
+		  { $ast = new InequalityExpression($left.ast, $right.ast); }
+		| left=expression 'er' 'n' right=expression                                                               // Logical Or Expression: ||
+		  { $ast = new LogicalOrExpression($left.ast, $right.ast); }
+		| left=expression 'n' right=expression                                                               // Logical And Expression: &&
+		  { $ast = new LogicalAndExpression($left.ast, $right.ast); }
 		| <assoc=right> id=Identifier 'is' right=expression                                                                // Variable assignment expression: =
-      	  { $ast = new AssignmentExp($id.text, $right.ast); }
+      	  { $ast = new VariableAssignmentExpression($id.text, $right.ast); }
     	| <assoc=right> id=Identifier 'at' idx=expression 'is' right=expression                                            // Array index assignment: [i] =
       	  { $ast = new ArrayAssignmentExpression($id.text, $idx.ast, $right.ast); }
 		;
+
+constantExpression returns [ConstantExpression ast] :                                   // A constant integer literal
+		c=Constant { $ast = new ConstantExpression(Integer.parseInt($c.text)); }        // Positive
+  		| '-' c=Constant { $ast = new ConstantExpression(-Integer.parseInt($c.text)); } // Negative
+
+stringExpression returns [StringExpression ast] :   // A string literal
+		s=String { $ast = new StringExpression($s.text); }
 
 embeddedFunctionName returns [String name] :
 		'yohoho'       { $name = "yohoho"; }         // Random integer (params: tally min, tally max)(returns: tally r in [min, max])
     	| 'stirthebilge' { $name = "stirthebilge"; } // Shuffle array elements: (params: plank <type> arr)(returns: plank <type> arr)
     	| 'squawk'       { $name = "squawk"; }       // Output to stdout: (params: <type> x) (returns: scroll x)
-    	| 'avast\'ye'    { $name = "avast'ye"; }     // Input from stdin: (params:) (returns: <type> x)
+    	| 'avast\'ye'    { $name = "avast\'ye"; }     // Input from stdin: (params:) (returns: <type> x)
     	;
 
 statement returns [Statement ast] :
-		e=expression '!' { $ast = $e.ast; }                                                                                                                     // Expression statement (assignment, function call, etc)
-		| 'aye' '(' cond=expression ')' cs=compoundStatement ( 'scurvy' scs=compoundStatement )?                                                                // If or If/Else
-		  { $ast = new SelectionStatement($cond.ast, $cs.ast, $scs != null ? $scs.ast : null); }
-		| 'in\'voyage' '(' cond=expression ')' cs=compoundStatement                                                                                             // While loop
-		  { $ast = new ConditionalLoopStatement($cond.ast, cs.ast); }
-		| 'fer\'all' '(' ( init=expression )? '!' ( cond=expression )? '!' ( incr=expression )? ')' cs=compoundStatement                                        // For loop
-		  { $ast = new IterativeLoopStatement($init != null ? $init.ast : null, $cond != null ? $cond.ast : null, $incr != null ? $incr.ast : null, $cs.ast); }
-		| 'booty' ( e=expression )? '!' {$ast = $e.ast}                                                                                                         // Return statement (from function)
+		e=expression '!' { $ast = new ExpressionStatement($e.ast); }                                                                                                                     // Expression statement (assignment, function call, etc)
+		| 'aye' '(' cond=expression ')' tbody=compoundStatement ( 'scurvy' fbody=compoundStatement )?                                                                // If or If/Else
+		  { $ast = new SelectionStatement($cond.ast, $tbody.ast, $fbody != null ? $fbody.ast : null); }
+		| 'in\'voyage' '(' cond=expression ')' body=compoundStatement                                                                                             // While loop
+		  { $ast = new ConditionalLoopStatement($cond.ast, $body.ast); }
+		| 'fer\'all' '(' ( init=expression )? '!' ( cond=expression )? '!' ( incr=expression )? ')' body=compoundStatement                                        // For loop
+		  { $ast = new IterativeLoopStatement($init != null ? $init.ast : null, $cond != null ? $cond.ast : null, $incr != null ? $incr.ast : null, $body.ast); }
+		| 'booty' ( e=expression )? '!' {$ast = new ReturnStatement($e != null ? $e.ast : null); }                                                                                                         // Return statement (from function)
 		;
 
 // BELOW ARE RULES CREATED FOR FuncLang
