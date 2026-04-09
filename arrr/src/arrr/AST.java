@@ -8,7 +8,7 @@ import java.util.List;
  * This class hierarchy represents expressions in the abstract syntax tree
  * manipulated by this interpreter.
  * 
- * @author hridesh
+ * @author Josiah Tripp
  * 
  */
 public interface AST {
@@ -317,7 +317,7 @@ public interface AST {
 	 */
 	public static class LambdaExp extends Exp {		
 		List<String> _formals;
-		Exp _body;
+		Exp _body; 
 		
 		public LambdaExp(List<String> formals, Exp body) {
 			_formals = formals;
