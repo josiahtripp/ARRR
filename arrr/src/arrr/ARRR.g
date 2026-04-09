@@ -118,10 +118,12 @@ expression returns [Expression ast] :                                           
 constantExpression returns [ConstantExpression ast] :                                   // A constant integer literal
 		c=Constant { $ast = new ConstantExpression(Integer.parseInt($c.text)); }        // Positive
   		| '-' c=Constant { $ast = new ConstantExpression(-Integer.parseInt($c.text)); } // Negative
+		;
 
 stringExpression returns [StringExpression ast] :   // A string literal
 		s=String { $ast = new StringExpression($s.text); }
-
+		;
+		
 embeddedFunctionName returns [String name] :
 		'yohoho'       { $name = "yohoho"; }         // Random integer (params: tally min, tally max)(returns: tally r in [min, max])
     	| 'stirthebilge' { $name = "stirthebilge"; } // Shuffle array elements: (params: plank <type> arr)(returns: plank <type> arr)
@@ -353,9 +355,9 @@ statement returns [Statement ast] :
  Avastye : 'avast\'ye' ;
  Aye : 'aye' ;
  Scurvy : 'scurvy' ;
- Invoyage 'in\'voyage' ;
- Ferall 'fer\'all' ;
- Booty 'booty' ;
+ Invoyage: 'in\'voyage' ;
+ Ferall: 'fer\'all' ;
+ Booty: 'booty' ;
 
  Constant : DIGIT+ ;
 

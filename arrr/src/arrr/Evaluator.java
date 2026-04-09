@@ -72,22 +72,190 @@ public class Evaluator implements Visitor<Value> {
 		}
 	}
 
-	@override
+	@Override
 	public T visit(AST.Program e, Env env){
 
 	}
+	@Override
+	public Value visit(AST.FunctionDefinition e, Env env){
+		List<String> formals = new ArrayList<String>();
+		for(AST.ParameterDeclaration p: e.parameters()){
+			formals.add(p.name());
+		}	
+		Value.FunVal fun = new Value.FunVal(env, formals, e.body());
+		if (env instanceof GlobalEnv){
+			((GlobalEnv) env).extend(e.name(), fun);
+		}
+		return new UnitVal();
+	}
 
-	public T visit(AST.FunctionDefinition e, Env env);
-	public T visit(AST.ParameterDeclaration e, Env env);
-	public T visit(AST.CompoundStatement e, Env env);
-	public T visit(AST.VariableDeclaration e, Env env);
-	public T visit(AST.ArrayDeclaration e, Env env);
-	public T visit(AST.Declarator e, Env env);
-	public T visit(AST.NegationExpression p, Env env); // Should always return 1 or 0
-	public T visit(AST.ArrayAccessExpression e, Env env); // Should always return an integer or string
-	public T visit(AST.FunctionCallExpression e, Env env); // Should always return the return type of the function
-	public T visit(AST.EmbeddedFunctionCallExpression e, Env env); // Should always return the return type of the embedded function
+	@Override
+	public Value visit(AST.ParameterDeclaration e, Env env){
+		return new UnitVal();
+	}
 
+	@Override
+	public Value visit(AST.CompoundStatement e, Env env){
+		Env localEnv = env;
+
+    	for (AST.Declaration d : e.declarations()) {
+        	d.accept(this, localEnv);
+    	}
+
+    	for (AST.Statement s : e.statements()) {
+    	    Value v = (Value) s.accept(this, localEnv);
+
+        	if (v instanceof ReturnVal) {
+        	    return v;
+    	    }
+		}
+
+    	return new UnitVal();
+	}
+
+	@Override
+	public Value visit(AST.VariableDeclaration e, Env env) {
+	    AST.Declarator d = e.declarator();
+	    String name = d.name();
+
+	    Value value = new UnitVal();
+	    if (d.initializer() != null) {
+	        value = (Value) d.initializer().accept(this, env);
+	    }
+
+	    if (env instanceof GlobalEnv) {
+	        ((GlobalEnv) env).extend(name, value);
+	    }
+
+	    return new UnitVal();
+	}
+
+	@Override
+	public Value visit(AST.ArrayDeclaration e, Env env){
+		int size = (int) ((NumVal) e.sizeExpression().accept(this, env)).v();
+		List<Value> arr = new ArrayList<>();
+		for(int i=0; i<size; i++){
+			arr.add(new UnitVal());
+		}
+		Value arrayVal = new Value.ArrayVal(arr);
+		if (env instanceof GlobalEnv) {
+			((GlobalEnv) env).extend(e.name(), arrayVal);
+		}
+		return new UnitVal();
+	}
+
+	@Override
+	public Value visit(AST.Declarator e, Env env){
+		if(e.initializer() != null){
+			return (Value) e.initializer().accept(this, env);
+		}
+		return new UnitVal();
+	}
+	@Override
+	public Value visit(AST.NegationExpression p, Env env){// Should always return 1 or 0
+		Value v = (Value) e.getExpression().accept(this, env);
+		if(v instanceof NumVal){
+			return new NumVal(((NumVal) v).v() == 0 ? 1 : 0);
+		}
+		System.out.println("tisnot expects an integer expression");
+		return new DynamicError(e.getMessage());
+	} 
+	@override
+	public Value visit(AST.ArrayAccessExpression e, Env env);{// Should always return an integer or string
+    	Value arrVal = env.get(e.name());
+    	if (!(arrVal instanceof ArrayVal)) {
+    	    return new DynamicError(e.name() + " is not an array");
+		}
+
+    	Value idxVal = (Value) e.index().accept(this, env);
+    	if (!(idxVal instanceof NumVal)) {
+    	    return new DynamicError("array index must be an integer");
+    	}
+
+    	int index = (int) ((NumVal) idxVal).v();
+    	List<Value> elements = ((ArrayVal) arrVal).elements();
+
+    	if (index < 0 || index >= elements.size()) {
+    	    return new DynamicError("array index out of bounds");
+    	}
+
+    	return elements.get(index);
+	}
+	@override
+	public Value visit(AST.FunctionCallExpression e, Env env){// Should always return the return type of the function
+    	Value fn = env.get(e.name());
+
+    	if (!(fn instanceof Value.FunVal)) {
+    	    return new DynamicError(e.name() + " is not a function");
+    	}
+
+    	Value.FunVal fun = (Value.FunVal) fn;
+
+    	List<Value> actuals = new ArrayList<>();
+    	for (AST.Expression arg : e.arguments()) {
+    	    actuals.add((Value) arg.accept(this, env));
+    	}
+
+    	List<String> formals = fun.formals();
+    	if (formals.size() != actuals.size()) {
+    	    return new DynamicError("argument count mismatch in call to " + e.name());
+    	}
+
+    	Env funEnv = fun.env();
+    	for (int i = 0; i < formals.size(); i++) {
+    	    funEnv = new ExtendEnv(funEnv, formals.get(i), actuals.get(i));
+    	}
+
+    	Value result = (Value) fun.body().accept(this, funEnv);
+
+    	if (result instanceof ReturnVal) {
+    	    return ((ReturnVal) result).value();// Should always return the return type of the embedded function
+	
+    	}
+
+    	return result;
+	} 
+	@Override
+	public Value visit(AST.EmbeddedFunctionCallExpression e, Env env) {
+	    String name = e.name();
+	    List<AST.Expression> args = e.arguments();
+
+	    switch (name) {
+	        case "yohoho": {
+	            if (args.size() != 2) {
+	                return new DynamicError("yohoho expects 2 arguments");
+	            }
+
+	            int min = (int) ((NumVal) args.get(0).accept(this, env)).v();
+	            int max = (int) ((NumVal) args.get(1).accept(this, env)).v();
+
+	            int r = min + (int)(Math.random() * (max - min + 1));
+	            return new NumVal(r);
+	        }
+	
+	        case "squawk": {
+	            if (args.size() != 1) {
+	                return new DynamicError("squawk expects 1 argument");
+	            }
+	
+	            Value v = (Value) args.get(0).accept(this, env);
+	            System.out.println(v);
+	            return new StringVal(v.toString());
+	        }
+	
+	        case "avast'ye": {
+	            // placeholder until input is implemented
+	            return new StringVal("");
+	        }
+	
+	        case "stirthebilge": {
+	            return new DynamicError("stirthebilge not implemented yet");
+	        }
+	
+	        default:
+	            return new DynamicError("unknown embedded function: " + name);
+	    }
+	}
 	@Override
 	public Type visit(AST.ConstantExpression e, Env env){
 		return new IntegerType(e.val());
@@ -205,7 +373,7 @@ public class Evaluator implements Visitor<Value> {
 		return new IntegerType(left > right ? 1 : 0);
 	}
 
-	@Overrie
+	@Override
 	public T visit(AST.LessthanExpression e, Env env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
