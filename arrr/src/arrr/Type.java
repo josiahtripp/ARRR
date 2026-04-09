@@ -1,5 +1,6 @@
 package arrr;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import arrr.AST.Exp;
@@ -28,8 +29,36 @@ public interface Type {
 	    }
 	}
 
+    static class ArrayType implements Type {
+        private Type _type;
+        private List<Type> _val;
+
+        public ArrayType(Type type) {
+            _type = elementType;
+        }
+
+        public ArrayType(Type type, List<Type> val){
+            _type = elementType;
+            _val = val;
+        }
+
+        public Type type() {
+            return _type;
+        }
+
+        public List<Type> val() {
+            return _val;
+        }
+
+        public void setIdx(int idx, Type value) {
+            _val.set(idx, value);
+        }
+    }
+
 	static class IntegerType implements Type {
 	    private int _val;
+
+        public StringType(){}
 
 	    public IntegerType(int val){
             _val = val;
@@ -43,9 +72,11 @@ public interface Type {
 	static class StringType implements Type {
 		private String _val;
 
-	    public StringVal(String val){
+        public StringType() {}
+
+	    public StringType(String val){
             _val = val;
-        } 
+        }
 
 	    public String val(){
             return _val; 

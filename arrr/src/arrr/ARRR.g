@@ -38,7 +38,7 @@ parameterDeclaration returns [ParameterDeclaration ast] :         // A function 
 
 containerSpecifier returns [Type type] :                                   // The container type of a function parameter
 		type=typeSpecifier { $type = $type.type; }                          // A variable parameter
-		| 'plank' type=typeSpecifier { $type = new PlankType($type.type); } // An array parameter
+		| 'plank' type=typeSpecifier { $type = new ArrayType($type.type); } // An array parameter
 		;
 
 typeSpecifier returns [Type type] :              // Variable and array types

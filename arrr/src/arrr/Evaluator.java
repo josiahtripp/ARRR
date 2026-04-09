@@ -98,7 +98,7 @@ public class Evaluator implements Visitor<Value> {
 		return new StringType(e.str());
 	}
 	
-	public T visit(AST.VariableExpression e, Env env); // Should always return an integer, string, or plank (reference)
+	public T visit(AST.VariableExpression e, Env env);
 
 	@Override
 	public T visit(AST.MultiplicationExpression e, Env env){
@@ -142,9 +142,35 @@ public class Evaluator implements Visitor<Value> {
 	@Override
 	public T visit(AST.AdditionExpression e, Env env){
 
-		// Evaluate the left and right expression and retrive types
+		// Evaluate the left and right expressions and retrieve types
 		T left_t = e.getRight().accept(this);
 		T right_t = e.getRight().accept(this);
+
+		// Check if either expression is StringType
+		boolean left_is_str = (left_t instanceof StringType);
+		boolean right_is_str = (right_t instanceof StringType);
+
+		// Perform concatenation
+		if(left_is_str || right_is_str){
+
+			String result;
+
+			if(left_is_str){ // Left is string
+				result += ((StringType) left_t).val();
+			}
+			else{
+				result += ((IntegerType) left_t).val().tostring();
+			}
+
+			if(right_is_str){ // Right is string
+				result += ((StringType) right_t).val();
+			}
+			else{
+				result += ((IntegerType) right_t).val().tostring();
+			}
+
+			return new StringType(result);
+		}
 
 		// Both expressions are integers, cast to IntegerType and retrieve values
 		int left = ((IntegerType) left_t).val();
@@ -169,10 +195,80 @@ public class Evaluator implements Visitor<Value> {
 		return new IntegerType(result);
 	}
 
-	public T visit(AST.GreaterthanExpression e, Env env); // Should always return 1 or 0
-	public T visit(AST.LessthanExpression e, Env env); // Should always return 1 or 0
-	public T visit(AST.EqualityExpression e, Env env); // Should always return 1 or 0
-	public T visit(AST.InequalityExpression e, Env env); // Should always return 1 or 0
+	@Override
+	public T visit(AST.GreaterthanExpression e, Env env){
+
+		// Evaluate the left and right expressions (Must be IntegerType)
+		int left = ((IntegerType) e.getLeft().accept(this)).val();
+		int right = ((IntegerType) e.getRight().accept(this)).val();
+
+		return new IntegerType(left > right ? 1 : 0);
+	}
+
+	@Overrie
+	public T visit(AST.LessthanExpression e, Env env){
+
+		// Evaluate the left and right expressions (Must be IntegerType)
+		int left = ((IntegerType) e.getLeft().accept(this)).val();
+		int right = ((IntegerType) e.getRight().accept(this)).val();
+
+		return new IntegerType(left < right ? 1 : 0);
+	}
+
+	public T visit(AST.EqualityExpression e, Env env){
+
+		// Evaluate the left and right expressions and retrieve types
+		T left_t = e.getRight().accept(this);
+		T right_t = e.getRight().accept(this);
+
+		// Check if either expression is StringType
+		boolean left_is_str = (left_t instanceof StringType);
+		boolean right_is_str = (right_t instanceof StringType);
+
+		// Perform string comparison
+		if(left_is_str && right_is_str){
+
+			// Both expression are string, cast to StringType and retrieve values
+			String left = ((StringType) left_t).val();
+			String right = ((StringType) right_t).val();
+
+			return new IntegerType(left == right ? 1 : 0);
+		}
+
+		// Both expressions are integers, cast to IntegerType and retrieve values
+		int left = ((IntegerType) left_t).val();
+		int right = ((IntegerType) right_t).val();
+
+		return new IntegerType(left == right ? 1 : 0);
+	}
+
+	public T visit(AST.InequalityExpression e, Env env){
+
+		// Evaluate the left and right expressions and retrieve types
+		T left_t = e.getRight().accept(this);
+		T right_t = e.getRight().accept(this);
+
+		// Check if either expression is StringType
+		boolean left_is_str = (left_t instanceof StringType);
+		boolean right_is_str = (right_t instanceof StringType);
+
+		// Perform string comparison
+		if(left_is_str && right_is_str){
+
+			// Both expression are string, cast to StringType and retrieve values
+			String left = ((StringType) left_t).val();
+			String right = ((StringType) right_t).val();
+
+			return new IntegerType(left == right ? 0 : 1);
+		}
+
+		// Both expressions are integers, cast to IntegerType and retrieve values
+		int left = ((IntegerType) left_t).val();
+		int right = ((IntegerType) right_t).val();
+
+		return new IntegerType(left == right ? 0 : 1);
+	}
+
 	public T visit(AST.LogicalOrExpression e, Env env); // Should always return 1 or 0
 	public T visit(AST.LogicalAndExpression e, Env env); // Should always return 1 or 0 
 	public T visit(AST.VariableAssignmentExpression e, Env env); // Should always return the value assigned
