@@ -3,7 +3,10 @@ import static arrr.AST.*;
 import static arrr.Value.*;
 
 import java.util.List;
+import java.util.Random;
+import java.util.Scanner;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.io.File;
 import java.io.IOException;
 
@@ -35,6 +38,8 @@ import arrr.AST.Visitor;
 import arrr.Env.*;
 import arrr.Type.IntegerType;
 import arrr.Type.StringType;
+import arrr.Type.UnitType;
+import arrr.Type.VoidType;
 import arrr.Value.BoolVal;
 import arrr.Value.DynamicError;
 import arrr.Value.NumVal;
@@ -85,8 +90,139 @@ public class Evaluator implements Visitor<Value> {
 	public T visit(AST.Declarator e, Env env);
 	public T visit(AST.NegationExpression p, Env env); // Should always return 1 or 0
 	public T visit(AST.ArrayAccessExpression e, Env env); // Should always return an integer or string
-	public T visit(AST.FunctionCallExpression e, Env env); // Should always return the return type of the function
-	public T visit(AST.EmbeddedFunctionCallExpression e, Env env); // Should always return the return type of the embedded function
+	public T visit(AST.FunctionCallExpression e, Env env){
+		
+		// TODO:
+		// 1. Find the entry for the variable e.id() in the env chain (function name)
+		// 1.5 Lookup the entry for the function in the global env
+		// 2. Evaluate the parameter declaration list
+		// 3. Find the return type of the function
+		// 4. Create a new env for the compound statement
+		// 5. Evaluate all of the argument expressions, add them as variables to the env using the names and types from the parameter list
+		// 6. Evaluate the compound statement
+		// 7. If the function is void type, return a new VoidType()
+		// 8. If the function is not void type, return a new Type object from a return statement?
+
+		// Get the function name
+		String name = e.id();
+	}
+
+	@Override
+	public T visit(AST.EmbeddedFunctionCallExpression e, Env env){
+
+		// Persistent Random class instance
+		static Random rand = null;
+
+		// Get the name of the embedded function
+		String name = e.name();
+
+		// Create an argument list to hold evaluated argument expressions
+		List<Type> args = new ArrayList<Type>();
+
+		// Evaluate all argument expressions
+		for(Type exp : e.args()){
+
+			args.add(exp.accept(this, env));
+		}
+
+		// Random number specified range
+		if(name == "yohoho"){
+
+			// Incorrect number of arguments
+			if(args.size() != 2){
+				throw new RuntimeException("yohoho argument number mismatch: expected 2 but got " + args.size().toString());
+			}
+
+			// Get the range values
+			int start = ((IntegerType) args.get(0)).val();
+			int stop = ((IntegerType) args.get(1)).val();
+
+			// Invalid range
+			if(start >= stop){
+				throw new RuntimeException("yohoho invalid range: expected at least 1 integer but got [" + start.tostring() + ", " + stop.tostring() + "]");
+			}
+
+			// Create the Random instance
+			if(rand == null){
+				rand = new Random();
+			}
+
+			// Return the new random integer (Does not check bounds)
+			return new IntegerType(start + rand.nextInt((stop - start) + 1));
+		}
+
+		// Shuffle array
+		if(name == "stirthebilge"){
+
+			// Incorrect number of arguments
+			if(args.size() != 1){
+				throw new RuntimeException("stirthebilge argument number mismatch: expected 1 but got " + args.size().toString());
+			}
+
+			// Get the array (first argument)
+			List<Type> arr = ((ArrayType) args.get(0)).val();
+
+			// Shuffle the array
+			Collections.shuffle(arr, rand);
+
+			// Return the ArrayType object (argument)
+			return (ArrayType) args.get(0);
+		}
+
+		// Output
+		if (name == "squawk"){
+
+			// Incorrect number of arguments
+			if(args.size() != 1){
+				throw new RuntimeException("squawk argument number mismatch: expected 1 but got " + args.size().toString());
+			}
+
+			// Get the message type (first argument)
+			Type msg_t = args.get(0);
+
+			// Create an empty message
+			String msg;
+
+			// Convert from int to string
+			if(msg_t instanceof IntegerType){
+				msg = ((IntegerType) args.get(0)).val().tostring();
+			}
+			else{ // Capture string
+				msg = ((StringType) args.get(0)).val();
+			}
+
+			// Print message
+			System.out.print(msg);
+
+			// Return printed message as new StringType object
+			return new StringType(msg);
+		}
+
+		if(name = "avast'ye"){
+
+			// Incorrect number of arguments
+			if(args.size() != 0){
+				throw new RuntimeException("avast'ye argument number mismatch: expected 0 but got " + args.size().toString());
+			}
+
+			// Create an input scannner
+			Scanner scanner = new Scanner(System.in)
+
+			// Read a line of input
+			String input = scanner.nextLine();
+			
+			// Get the first "word" (character cluster) in the input string
+			input = input.split("\\s+")[0];
+
+			// Return as integer if possible
+			try{
+				return new IntegerType(Integer.parseInt(input));
+			}
+			catch (NumberFormatException e){ // Return as string if else
+				return new StringType(input);
+			}
+		}
+	}
 
 	@Override
 	public Type visit(AST.ConstantExpression e, Env env){
@@ -98,14 +234,15 @@ public class Evaluator implements Visitor<Value> {
 		return new StringType(e.str());
 	}
 	
+	@Override
 	public T visit(AST.VariableExpression e, Env env);
 
 	@Override
 	public T visit(AST.MultiplicationExpression e, Env env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
-		int left = ((IntegerType) e.getLeft().accept(this)).val();
-		int right = ((IntegerType) e.getRight().accept(this)).val();
+		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
+		int right = ((IntegerType) e.getRight().accept(this, env)).val();
 
 		// Calculate the result
 		int result = left * right;
@@ -117,8 +254,8 @@ public class Evaluator implements Visitor<Value> {
 	public T visit(AST.DivisionExpression e, Env env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
-		int left = ((IntegerType) e.getLeft().accept(this)).val();
-		int right = ((IntegerType) e.getRight().accept(this)).val();
+		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
+		int right = ((IntegerType) e.getRight().accept(this, env)).val();
 
 		// Calculate the result
 		int result = left / right;
@@ -130,8 +267,8 @@ public class Evaluator implements Visitor<Value> {
 	public T visit(AST.ModuloExpression e, Env env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
-		int left = ((IntegerType) e.getLeft().accept(this)).val();
-		int right = ((IntegerType) e.getRight().accept(this)).val();
+		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
+		int right = ((IntegerType) e.getRight().accept(this, env)).val();
 
 		// Calculate the result
 		int result = left % right;
@@ -143,8 +280,8 @@ public class Evaluator implements Visitor<Value> {
 	public T visit(AST.AdditionExpression e, Env env){
 
 		// Evaluate the left and right expressions and retrieve types
-		T left_t = e.getRight().accept(this);
-		T right_t = e.getRight().accept(this);
+		T left_t = e.getRight().accept(this, env);
+		T right_t = e.getRight().accept(this, env);
 
 		// Check if either expression is StringType
 		boolean left_is_str = (left_t instanceof StringType);
@@ -186,8 +323,8 @@ public class Evaluator implements Visitor<Value> {
 	public T visit(AST.SubtractionExpression e, Env env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
-		int left = ((IntegerType) e.getLeft().accept(this)).val();
-		int right = ((IntegerType) e.getRight().accept(this)).val();
+		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
+		int right = ((IntegerType) e.getRight().accept(this, env)).val();
 
 		// Calculate the result
 		int result = left - right;
@@ -199,27 +336,28 @@ public class Evaluator implements Visitor<Value> {
 	public T visit(AST.GreaterthanExpression e, Env env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
-		int left = ((IntegerType) e.getLeft().accept(this)).val();
-		int right = ((IntegerType) e.getRight().accept(this)).val();
+		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
+		int right = ((IntegerType) e.getRight().accept(this, env)).val();
 
 		return new IntegerType(left > right ? 1 : 0);
 	}
 
-	@Overrie
+	@Override
 	public T visit(AST.LessthanExpression e, Env env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
-		int left = ((IntegerType) e.getLeft().accept(this)).val();
-		int right = ((IntegerType) e.getRight().accept(this)).val();
+		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
+		int right = ((IntegerType) e.getRight().accept(this, env)).val();
 
 		return new IntegerType(left < right ? 1 : 0);
 	}
 
+	@Override
 	public T visit(AST.EqualityExpression e, Env env){
 
 		// Evaluate the left and right expressions and retrieve types
-		T left_t = e.getRight().accept(this);
-		T right_t = e.getRight().accept(this);
+		T left_t = e.getRight().accept(this, env);
+		T right_t = e.getRight().accept(this, env);
 
 		// Check if either expression is StringType
 		boolean left_is_str = (left_t instanceof StringType);
@@ -242,11 +380,12 @@ public class Evaluator implements Visitor<Value> {
 		return new IntegerType(left == right ? 1 : 0);
 	}
 
+	@Override
 	public T visit(AST.InequalityExpression e, Env env){
 
 		// Evaluate the left and right expressions and retrieve types
-		T left_t = e.getRight().accept(this);
-		T right_t = e.getRight().accept(this);
+		T left_t = e.getRight().accept(this, env);
+		T right_t = e.getRight().accept(this, env);
 
 		// Check if either expression is StringType
 		boolean left_is_str = (left_t instanceof StringType);
@@ -269,15 +408,136 @@ public class Evaluator implements Visitor<Value> {
 		return new IntegerType(left == right ? 0 : 1);
 	}
 
-	public T visit(AST.LogicalOrExpression e, Env env); // Should always return 1 or 0
-	public T visit(AST.LogicalAndExpression e, Env env); // Should always return 1 or 0 
-	public T visit(AST.VariableAssignmentExpression e, Env env); // Should always return the value assigned
-	public T visit(AST.ArrayAssignmentExpression e, Env env); // Should always return the value assigned
-	public T visit(AST.ExpressionStatement e, Env env); // Should not return anything (evaluate expression)
-	public T visit(AST.SelectionStatement e, Env env); // Should not return anything
-	public T visit(AST.ConditionalLoopStatement e, Env env); // Should not return anything
-	public T visit(AST.IterativeLoopStatement e, Env env); // Should not return anything
-	public T visit(AST.ReturnStatement e, Env env); // Should not return anything (evaluate expression)
+	@Override
+	public T visit(AST.LogicalOrExpression e, Env env){
+		
+		// Evaluate the left and right expressions (Must be IntegerType)
+		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
+		int right = ((IntegerType) e.getRight().accept(this, env)).val();
+
+		return new IntegerType((left != 0 || right != 0) ? 1 : 0);
+	}
+
+	@Override
+	public T visit(AST.LogicalAndExpression e, Env env){
+		
+		// Evaluate the left and right expressions (Must be IntegerType)
+		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
+		int right = ((IntegerType) e.getRight().accept(this, env)).val();
+
+		return new IntegerType((left != 0 && right != 0) ? 1 : 0);
+	}
+
+	@Override
+	public T visit(AST.VariableAssignmentExpression e, Env env){
+
+		//((IntegerType) e.exp().accept(this, env)).val()
+		// 1. Find the entry for the variable e.id() in the env chain
+		// 2. Evaluate the expression with e.exp().accept(this, env).???
+		// 3. Update the entry in the env chain
+		// 4. Return the value of the expression assigned
+	}
+
+	@Override
+	public T visit(AST.ArrayAssignmentExpression e, Env env){
+
+		// TODO:
+		// 1. Find the entry for the variable e.id() in the env chain
+		// 2. Evaluate the expression with e.exp().accept(this, env).???
+		// 3. Update the entry in the env chain (at the specified index)
+		// 4. Return the value of the expression assigned
+	}
+
+	@Override
+	public T visit(AST.ExpressionStatement e, Env env){
+
+		// Evaluate the expression
+		e.exp().accept(this, env);
+		
+		// Return UnitType (Statement should not return anything)
+		return new UnitType();
+	}
+
+	@Override
+	public T visit(AST.SelectionStatement e, Env env){
+		
+		// TODO:
+		// Evaluate the condition expression
+		int cond = ((IntegerType) e.cond().accept(this, env)).val();
+
+		// Check the condition
+		if(cond != 0){
+
+			// Create a new env for the compound statement
+			// Run the compound statement tbody()
+		}
+		else if(e.fbody() != null){
+
+			// Create a new env for the compound statement
+			// Run the compound statement fbody()
+		}
+
+		return new UnitType();
+	}
+
+	@Override
+	public T visit(AST.ConditionalLoopStatement e, Env env){
+
+		// TODO:
+		// Evaluate the condition expression
+		int cond = ((IntegerType) e.cond().accept(this, env)).val();
+
+		// Check the condition, run until it fails
+		while(cond != 0){
+
+			// Create a new env for the compound statement
+			// Run the compound statement tbody()
+
+			// Check the condition again
+			cond = ((IntegerType) e.cond().accept(this, env)).val();
+		}
+
+		return new UnitType();
+	}
+
+	@Override
+	public T visit(AST.IterativeLoopStatement e, Env env){
+
+		// TODO:
+		// Evaluate the initial expression
+		e.init().accept(this, env)
+
+		// Evaluate the condition expression
+		int cond = ((IntegerType) e.cond().accept(this, env)).val();
+
+		// Check the condition, run until it fails
+		while(cond != 0){
+
+			// Create a new env for the compound statement
+			// Run the compound statement tbody()
+
+			// Evaluate the increment expression
+			e.incr().accept(this, env)
+
+			// Evaluate the condition again
+			cond = ((IntegerType) e.cond().accept(this, env)).val();
+		}
+
+		return new UnitType();
+	}
+
+	@Override
+	public T visit(AST.ReturnStatement e, Env env){
+		
+		// If an expression is provided in the return statement, return it
+		if(e.exp() != null){
+
+			return e.exp().accept(this, env);
+		}
+		
+		// Otherwise, return a void type
+		return new VoidType();
+	}
 	
 	@Override
 	public Value visit(AddExp e, Env env) {
