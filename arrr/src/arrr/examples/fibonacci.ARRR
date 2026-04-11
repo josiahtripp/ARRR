@@ -1,4 +1,7 @@
-canon fib fires tally with tally x {
+// File: fibonacci.ARRR
+// Program: Recursively calculates and neatly prints the first 21 (0th to 20th) fibonacci sequence terms. 
+
+canon fib fires tally with tally x{
 
     aye(x belessthan 1){
         booty 0!
@@ -8,51 +11,13 @@ canon fib fires tally with tally x {
         booty 1!
     }
 
-    booty (fire fib with x forkover 1) bestow (fire fib with x forkover 2)!
+    booty (fire fib with x forkover 2) bestow (fire fib with x forkover 1)!
 }
 
 canon vessel fires naught{
 
-    tally x!
-    tally max!
-    plank 10 tally results!
-    
-    squawk with "What be the highest term to calculate for ye fibonacci sequence? ([0, 25]) :"!
-    max is avast'ye!
-
-    aye(max belessthan 0){
-        squawk with "YARGGG!! Ye can't go negative ya scallywag!\n"!
-        booty!
+    tally i!
+    fer'all(i is 0! i belessthan 21! i is i bestow 1){
+        squawk with "fib(" bestow i bestow "): " bestow (fire fib with i) bestow "\n"!
     }
-
-    aye(max bemorthan 25){
-        squawk with "YARGGG!! Ye tryna sink me ship?? Too high!\n"!
-        booty!
-    }
-
-    fer'all(x is 0! x belessthan (max bestow 1)! x is x bestow 1){
-        results at x is fire fib with x!
-    }
-
-    squawk with "Ordered Fibonacci sequence:\n\t"!
-    fer'all(x is 0! x belessthan max bestow 1! x is x bestow 1){
-        squawk with results at x!
-        
-        aye(x benot max){
-            squawk with ", "!
-        }
-    }
-    squawk with "\n\n"!
-
-    stirthebilge with results!
-
-    squawk with "Shuffled Fibonacci sequence:\n\t"!
-    fer'all(x is 0! x belessthan max bestow 1! x is x bestow 1){
-        squawk with results at x!
-        
-        aye(x benot max){
-            squawk with ", "!
-        }
-    }
-    squawk with "\n"!
 }

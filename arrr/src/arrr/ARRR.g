@@ -79,14 +79,14 @@ expressionList returns [List<Expression> ast]              // List of expression
 expression returns [Expression ast] :                                                                                      // Order defined order of operations
 		'(' exp=expression ')' { $ast = $exp.ast; }                                                                            // Unary operator, parenthesis: ()
 		| 'tisnot' exp=expression { $ast = new NegationExpression($exp.ast); }                                                 // Unary operator, negation: !
-		| id=Identifier 'at' idx=expression { $ast = new ArrayAccessExpression($id.text, $idx.ast); }                      // Array element access: [i]
+		| id=Identifier 'at' idx=expression { $ast = new ArrayAccessExpression($id.text, $idx.ast); }
 		| 'fire' id=Identifier ( 'with' args=expressionList )? 
 		  { $ast = new FunctionCallExpression($id.text, $args.ctx != null ? $args.ast : null); }           // Function call
 		| func=embeddedFunctionName ( 'with' args=expressionList )?
 		  { $ast = new EmbeddedFunctionCallExpression($func.name, $args.ctx != null ? $args.ast : null); } // Embedded function
 		| c=constantExpression { $ast = $c.ast; }                                                           // Integer literal: 12345
 		| s=stringExpression { $ast = $s.ast; }                                                               // String literal: "abcdef"
-		| id=Identifier { $ast = new VariableExpression($id.text); }                                                       // Variable access: n
+		| id=Identifier { $ast = new VariableExpression($id.text); }                                
 		| left=expression 'stack\'em' right=expression                                        // Multiplication expression: *
 		  { $ast = new MultiplicationExpression($left.ast, $right.ast); }
 		| left=expression 'doleout' right=expression                                        // Division expression: /
@@ -109,10 +109,20 @@ expression returns [Expression ast] :                                           
 		  { $ast = new LogicalOrExpression($left.ast, $right.ast); }
 		| left=expression 'n' right=expression                                                               // Logical And Expression: &&
 		  { $ast = new LogicalAndExpression($left.ast, $right.ast); }
-		| <assoc=right> id=Identifier 'is' right=expression                                                                // Variable assignment expression: =
-      	  { $ast = new VariableAssignmentExpression($id.text, $right.ast); }
-    	| <assoc=right> id=Identifier 'at' idx=expression 'is' right=expression                                            // Array index assignment: [i] =
-      	  { $ast = new ArrayAssignmentExpression($id.text, $idx.ast, $right.ast); }
+		| <assoc=right> left=expression 'is' right=expression                                                                                                    
+		  {
+		      if ($left.ast instanceof VariableExpression) {
+		          VariableExpression varAst = (VariableExpression) $left.ast;
+		          $ast = new VariableAssignmentExpression(varAst.id(), $right.ast); 
+		      } 
+		      else if ($left.ast instanceof ArrayAccessExpression) {
+		          ArrayAccessExpression arrAst = (ArrayAccessExpression) $left.ast;
+		          $ast = new ArrayAssignmentExpression(arrAst.id(), arrAst.idx(), $right.ast);
+		      } 
+		      else {
+		          throw new RuntimeException("Invalid assignment target. Left side must be a variable or array.");
+		      }
+		  }
 		;
 
 constantExpression returns [ConstantExpression ast] :                                   // A constant integer literal

@@ -1,3 +1,6 @@
+// File: helloworld.ARRR
+// Program: Prints the string "Hello World!" to the terminal, followed by a newline.
+
 canon vessel fires naught{
 
     squawk with "Hello World!\n" !

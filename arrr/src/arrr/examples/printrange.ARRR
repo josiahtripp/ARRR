@@ -1,3 +1,6 @@
+// File: printrange
+// Program: Prompts the user to input a start integer and stopping integer, then prints the inclusive range of integers between them.
+
 canon vessel fires naught 
 { 
     tally start!

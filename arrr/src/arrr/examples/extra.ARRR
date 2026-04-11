@@ -1,0 +1,73 @@
+// File: extra.ARRR
+// Program: Prompts the user to enter their name, followed by a number of numbers. 
+//          Then, prompts the user to enter |number| integers and adds them to a list.
+//          Then, prints the list in the order it was entered, a randomly shuffled order, and in increasing order.
+//          Finally, prints a farewell message to the terminal, addressing the user by the name they had entered previously.
+
+scroll name!
+
+canon vessel fires naught {
+    
+    squawk with "What is your name?: "!
+    name is avast'ye!
+
+    squawk with "How many numbers?: "!
+    fire ext with avast'ye!
+}
+
+canon printTallyPlank fires naught with plank tally arr an tally arrSize{
+
+    tally i!
+
+    squawk with "{ "!
+    fer'all(i is 0! i belessthan arrSize! i is i bestow 1){
+        squawk with arr at i!
+
+        aye(i belessthan arrSize forkover 1){
+            squawk with ", "!
+        }
+    }
+    squawk with " }\n"!
+}
+
+canon sortTallyPlank fires naught with plank tally arr an tally arrSize{
+
+    tally i!
+    tally j!
+    tally tmp!
+
+    fer'all(i is 0! i belessthan arrSize! i is i bestow 1){
+        fer'all(j is i! j belessthan arrSize! j is j bestow 1){
+
+            aye(arr at i bemorthan arr at j){
+                tmp is arr at i!
+                arr at i is arr at j!
+                arr at j is tmp!
+            }
+        }
+    }
+}
+
+canon ext fires naught with tally arrSize{
+
+    plank arrSize tally arr!
+    tally i is 0!
+
+    fer'all(i is 0! i belessthan arrSize! i is i bestow 1){
+        squawk with "\tPlease enter #" bestow (i bestow 1) bestow ": "!
+        arr at i is avast'ye!
+    }
+
+    squawk with "\nIn order received:\n\t"!
+    fire printTallyPlank with arr an arrSize!
+
+    squawk with "\nRandomly shuffled:\n\t"!
+    stirthebilge with arr!
+    fire printTallyPlank with arr an arrSize!
+
+    squawk with "\nIncreasing order:\n\t"!
+    fire sortTallyPlank with arr an arrSize!
+    fire printTallyPlank with arr an arrSize!
+
+    squawk with "\nSee you next time " bestow name bestow "!\n"!
+}
