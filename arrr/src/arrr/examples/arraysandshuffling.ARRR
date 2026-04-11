@@ -1,0 +1,38 @@
+// File: arraysandshuffling.ARRR
+// Program: Creates a list of integers from 0 to 100, where even numbers are negated. 
+            Then, the list is shuffled and printed out to the terminal
+            Then, the string "X bottles of run!", where X is an integer, is printed to the screen for X=100 down to x=1
+
+canon printPlank fires naught with plank tally p an tally x {
+
+    tally i!
+    fer'all(i is 0! i belessthan x! i is i bestow 1){
+        squawk with p at i!
+        squawk with "\n"!
+    }
+}
+
+canon vessel fires naught{
+
+    plank 100 tally oddNums!
+    tally oddNumsIdx is 0!
+    tally i!
+
+    fer'all(i is 1! i belessthan 101! i is i bestow 1){
+
+        aye(i dregs 2 benot 0){
+            oddNums at oddNumsIdx is i!
+        }
+        scurvy{
+            oddNums at oddNumsIdx is -1 stack'em i!
+        }
+        oddNumsIdx is oddNumsIdx bestow 1!
+    }
+
+    stirthebilge with oddNums!
+    fire printPlank with oddNums an 100!
+
+    fer'all(i is 100! i bemorthan 0! i is i forkover 1){
+        squawk with i bestow " barrels of rum!\n"!
+    }
+}
