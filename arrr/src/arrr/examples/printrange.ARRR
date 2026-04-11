@@ -1,0 +1,33 @@
+canon vessel fires naught 
+{ 
+    tally start!
+    tally stop!
+    tally i!
+
+    squawk with "Enter the starting number: "!
+    start is avast'ye!
+
+    squawk with "Enter the stopping number: "!
+    stop is avast'ye!
+
+    i is start!
+
+    aye(stop bemorthan start)
+    {
+        in'voyage(tisnot (i bemorthan stop))
+        {
+            squawk with i!
+            squawk with "\n"!
+            i is i bestow 1!
+        }
+    }
+    scurvy
+    {
+        in'voyage(tisnot (i belessthan stop))
+        {
+            squawk with i!
+            squawk with "\n"!
+            i is i forkover 1!
+        }
+    }
+}

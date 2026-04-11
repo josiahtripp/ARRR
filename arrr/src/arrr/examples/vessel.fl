@@ -1,5 +1,0 @@
-(define vessel 
-	(lambda () 
-		50
-	)
-)

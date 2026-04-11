@@ -39,7 +39,25 @@ public class Environment {
 		return new UnitType();
 	}
 
+	// Sets a value anywhere in the scope, or creates a new one in the current scope
 	public void set(String name, Type value){
+
+		// Creating a new identifier - value pair
+		if(get(name) instanceof UnitType){
+			_map.put(name, value);
+		}
+
+		// Exists, just not in current scope
+		if(getCurrent(name) instanceof UnitType){
+			_parent.set(name, value);
+		}
+		else{ // Exists in current scope, add it here
+			_map.put(name, value);
+		}
+	}
+
+	// Sets a value only in the current scope
+	public void setCurrent(String name, Type value){
 		_map.put(name, value);
 	}
 }

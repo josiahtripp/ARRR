@@ -91,6 +91,22 @@ public interface Type {
         public VoidType(){}
     }
 
+    static class ReturnType implements Type {
+        private Type _val;
+
+        public ReturnType() {
+            _val = new VoidType();
+        }
+
+	    public ReturnType(Type val){
+            _val = val;
+        }
+
+	    public Type val(){
+            return _val; 
+        }
+    }
+
     static class UnitType implements Type {
         public UnitType(){}
     }

@@ -65,7 +65,7 @@ compoundStatement returns [CompoundStatement ast]                               
 
 declaration returns [Declaration ast] :                                                               // A declaration for a variable or an array
 		t=typeSpecifier id=Identifier ( 'is' exp=expression )? '!'                                 // Variable
-		  { $ast = new VariableDeclaration($t.ast, $id.text, $exp.ast); }
+		  { $ast = new VariableDeclaration($t.ast, $id.text, $exp.ctx != null ? $exp.ast : null); }
 		| 'plank' exp=expression t=typeSpecifier id=Identifier '!'                                 // Array
 		  { $ast = new ArrayDeclaration($exp.ast, $t.ast, $id.text); }
 		;
@@ -81,9 +81,9 @@ expression returns [Expression ast] :                                           
 		| 'tisnot' exp=expression { $ast = new NegationExpression($exp.ast); }                                                 // Unary operator, negation: !
 		| id=Identifier 'at' idx=expression { $ast = new ArrayAccessExpression($id.text, $idx.ast); }                      // Array element access: [i]
 		| 'fire' id=Identifier ( 'with' args=expressionList )? 
-		  { $ast = new FunctionCallExpression($id.text, $args.ast); }           // Function call
+		  { $ast = new FunctionCallExpression($id.text, $args.ctx != null ? $args.ast : null); }           // Function call
 		| func=embeddedFunctionName ( 'with' args=expressionList )?
-		  { $ast = new EmbeddedFunctionCallExpression($func.name, $args.ast); } // Embedded function
+		  { $ast = new EmbeddedFunctionCallExpression($func.name, $args.ctx != null ? $args.ast : null); } // Embedded function
 		| c=constantExpression { $ast = $c.ast; }                                                           // Integer literal: 12345
 		| s=stringExpression { $ast = $s.ast; }                                                               // String literal: "abcdef"
 		| id=Identifier { $ast = new VariableExpression($id.text); }                                                       // Variable access: n
@@ -134,12 +134,12 @@ embeddedFunctionName returns [String name] :
 statement returns [Statement ast] :
 		e=expression '!' { $ast = new ExpressionStatement($e.ast); }                                                                                                                     // Expression statement (assignment, function call, etc)
 		| 'aye' '(' cond=expression ')' tbody=compoundStatement ( 'scurvy' fbody=compoundStatement )?                                                                // If or If/Else
-		  { $ast = new SelectionStatement($cond.ast, $tbody.ast, $fbody.ast); }
+		  { $ast = new SelectionStatement($cond.ast, $tbody.ast, $fbody.ctx != null ? $fbody.ast : null); }
 		| 'in\'voyage' '(' cond=expression ')' body=compoundStatement                                                                                             // While loop
 		  { $ast = new ConditionalLoopStatement($cond.ast, $body.ast); }
 		| 'fer\'all' '(' ( init=expression )? '!' ( cond=expression )? '!' ( incr=expression )? ')' body=compoundStatement                                        // For loop
-		  { $ast = new IterativeLoopStatement($init.ast, $cond.ast, $incr.ast, $body.ast); }
-		| 'booty' ( e=expression )? '!' {$ast = new ReturnStatement($e.ast); }                                                                                                         // Return statement (from function)
+		  { $ast = new IterativeLoopStatement( $init.ctx != null ? $init.ast : null, $cond.ctx != null ? $cond.ast : null, $incr.ctx != null ? $incr.ast : null, $body.ast); }
+		| 'booty' ( e=expression )? '!' {$ast = new ReturnStatement($e.ctx != null ? $e.ast : null); }                                                                                                         // Return statement (from function)
 		;
 
 

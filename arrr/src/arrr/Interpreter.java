@@ -18,7 +18,7 @@ public class Interpreter {
 			}
 		} 
 		else {
-			System.out.println("Invalid invocation. Ye be speakin' gibberish lad! Grant me a file and one file only!");
+			System.out.println("Ye be speakin' gibberish lad! Grant me a file and one file only!");
 			return;
 		}
 
@@ -37,9 +37,6 @@ public class Interpreter {
 
 			return;
 
-		} catch (IOException e) {
-			System.out.println("Error reading input:" + e.getMessage());
-			return;
 		} catch (NullPointerException e) {
 			System.out.println("Error:" + e.getMessage());
 			return;

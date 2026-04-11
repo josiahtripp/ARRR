@@ -105,8 +105,8 @@ public class Evaluator implements Visitor<Type> {
 			// Evaluate the statement
 			Type result = (Type) stmt.accept(this, env);
 
-			// Return statement evaluated, return expression
-			if(!(result instanceof UnitType)){
+			// Return statement present, pass the value back
+			if(result instanceof ReturnType){
 				return result;
 			}
 		}
@@ -177,7 +177,7 @@ public class Evaluator implements Visitor<Type> {
 		}
 
 		// Set the variable in the current env
-		env.set(name, init);
+		env.setCurrent(name, init);
 
 		return new UnitType();
 	}
@@ -202,9 +202,9 @@ public class Evaluator implements Visitor<Type> {
 		// String element type
 		if(type instanceof StringType){
 
-			List<Type> list = new ArrayList<Type>(size);
+			List<Type> list = new ArrayList<Type>();
 			for(int i = 0; i < size; i++){
-				list.set(i, new StringType(""));
+				list.add(new StringType(""));
 			}
 
 			Type arr = new ArrType(new StringType(), list);
@@ -215,9 +215,9 @@ public class Evaluator implements Visitor<Type> {
 		// Integer element type
 		if(type instanceof IntegerType){
 
-			List<Type> list = new ArrayList<Type>(size);
+			List<Type> list = new ArrayList<Type>();
 			for(int i = 0; i < size; i++){
-				list.set(i, new IntegerType(0));
+				list.add(new IntegerType(0));
 			}
 
 			Type arr = new ArrType(new IntegerType(), list);
@@ -256,7 +256,7 @@ public class Evaluator implements Visitor<Type> {
 	public Type visit(AST.FunctionCallExpression e, Environment env){
 
 		// Get the function type object
-		FunctionType func = (FunctionType) env.get(e.id());
+		FunctionType func = (FunctionType) global_environment.get(e.id());
 
 		// Wrong number of arguments
 		if(e.args().size() != func.params().size()){
@@ -292,29 +292,38 @@ public class Evaluator implements Visitor<Type> {
 			}
 
 			// Add the parameter to the function body environment
-			body_env.set(func.params().get(i).id(), result);
+			body_env.setCurrent(func.params().get(i).id(), result);
 		}
 
 		// Evaluate the body compound statement
 		Type result = func.body().accept(this, body_env);
 
-		// Void function returned without return statement
-		if(func.type() instanceof VoidType){
-			if(result instanceof UnitType){
-				result = new VoidType();
-			}
-		}
+		// Value returned
+		if(result instanceof ReturnType){
 
-		// Mismatch return type
-		if(result.getClass() != func.type().getClass()){
-			throw new RuntimeException("Function call: mismatch return type");
-		}
+			result = ((ReturnType) result).val();
 
-		// Mismatch return array element type
-		if(result instanceof ArrType){
-			if(((ArrType) result).type().getClass() != ((ArrType) func.type()).type().getClass()){
+			// Mismatch return type
+			if(result.getClass() != func.type().getClass()){
 				throw new RuntimeException("Function call: mismatch return type");
 			}
+
+			// Mismatch return array element type
+			if(result instanceof ArrType){
+				if(((ArrType) result).type().getClass() != ((ArrType) func.type()).type().getClass()){
+					throw new RuntimeException("Function call: mismatch return type");
+				}
+			}
+		}
+
+		// Void function, the result is just void
+		else if(func.type() instanceof VoidType){
+			result = new VoidType();
+		}
+
+		// No value returned on value returning function
+		else{
+			throw new RuntimeException("Function call: No value returned from non-void type function");
 		}
 
 		return result;
@@ -499,7 +508,7 @@ public class Evaluator implements Visitor<Type> {
 	public Type visit(AST.AdditionExpression e, Environment env){
 
 		// Evaluate the left and right expressions and retrieve types
-		Type left_t = e.getRight().accept(this, env);
+		Type left_t = e.getLeft().accept(this, env);
 		Type right_t = e.getRight().accept(this, env);
 
 		// Check if either expression is StringType
@@ -575,7 +584,7 @@ public class Evaluator implements Visitor<Type> {
 	public Type visit(AST.EqualityExpression e, Environment env){
 
 		// Evaluate the left and right expressions and retrieve types
-		Type left_t = e.getRight().accept(this, env);
+		Type left_t = e.getLeft().accept(this, env);
 		Type right_t = e.getRight().accept(this, env);
 
 		// Check if either expression is StringType
@@ -603,7 +612,7 @@ public class Evaluator implements Visitor<Type> {
 	public Type visit(AST.InequalityExpression e, Environment env){
 
 		// Evaluate the left and right expressions and retrieve types
-		Type left_t = e.getRight().accept(this, env);
+		Type left_t = e.getLeft().accept(this, env);
 		Type right_t = e.getRight().accept(this, env);
 
 		// Check if either expression is StringType
@@ -711,6 +720,8 @@ public class Evaluator implements Visitor<Type> {
 		// Evaluate the expression to assign
 		Type value = e.exp().accept(this, env);
 
+		System.out.println("Value: " + ((IntegerType) value).val() + "\nidx: " + idx);
+
 		// Integer element array
 		if(arr.type() instanceof IntegerType){
 
@@ -762,9 +773,9 @@ public class Evaluator implements Visitor<Type> {
 			// Evaluate the body compound statement
 			Type result = (Type) e.tbody().accept(this, tbody_env);
 
-			// Return statement evaluated
-			if(!(result instanceof UnitType)){
-				throw new RuntimeException("selection statement: Invalid return statement");
+			// Return statement present, pass the value back
+			if(result instanceof ReturnType){
+				return result;
 			}
 			
 		}
@@ -776,9 +787,9 @@ public class Evaluator implements Visitor<Type> {
 			// Evaluate the body compound statement
 			Type result = (Type) e.fbody().accept(this, fbody_env);
 
-			// Return statement evaluated
-			if(!(result instanceof UnitType)){
-				throw new RuntimeException("selection statement: Invalid return statement");
+			// Return statement present, pass the value back
+			if(result instanceof ReturnType){
+				return result;
 			}
 		}
 
@@ -800,9 +811,9 @@ public class Evaluator implements Visitor<Type> {
 			// Evaluate the body compound statement
 			Type result = (Type) e.body().accept(this, body_env);
 
-			// Return statement evaluated
-			if(!(result instanceof UnitType)){
-				throw new RuntimeException("conditional loop: Invalid return statement");
+			// Return statement present, pass the value back
+			if(result instanceof ReturnType){
+				return result;
 			}
 
 			// Check the condition again
@@ -840,9 +851,9 @@ public class Evaluator implements Visitor<Type> {
 			// Evaluate the body compound statement
 			Type result = (Type) e.body().accept(this, body_env);
 
-			// Return statement evaluated
-			if(!(result instanceof UnitType)){
-				throw new RuntimeException("iterative conditional loop: Invalid return statement");
+			// Return statement present, pass the value back
+			if(result instanceof ReturnType){
+				return result;
 			}
 
 			// Evaluate the increment expression
@@ -865,10 +876,10 @@ public class Evaluator implements Visitor<Type> {
 		// If an expression is provided in the return statement, return it
 		if(e.exp() != null){
 
-			return e.exp().accept(this, env);
+			return new ReturnType(e.exp().accept(this, env));
 		}
 		
-		// Otherwise, return a void type
-		return new VoidType();
+		// Otherwise, return a void return type
+		return new ReturnType();
 	}
 }

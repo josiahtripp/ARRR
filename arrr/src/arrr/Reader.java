@@ -10,6 +10,7 @@ import arrr.AST.Program;
 import arrr.parser.ARRRLexer;
 import arrr.parser.ARRRParser;
 
+
 public class Reader {
 
 	private BufferedReader inputStream;   
