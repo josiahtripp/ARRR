@@ -1,117 +1,327 @@
 package arrr;
 import static arrr.AST.*;
-import static arrr.Value.*;
 
 import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.stream.Collectors;
+
+import javax.lang.model.type.UnknownTypeException;
+import javax.management.openmbean.ArrayType;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.io.File;
 import java.io.IOException;
 
-import arrr.AST.AddExp;
-import arrr.AST.BoolExp;
-import arrr.AST.CallExp;
-import arrr.AST.CarExp;
-import arrr.AST.CdrExp;
-import arrr.AST.ConsExp;
-import arrr.AST.DefineDecl;
-import arrr.AST.DivExp;
-import arrr.AST.EqualExp;
-import arrr.AST.EvalExp;
-import arrr.AST.GreaterExp;
-import arrr.AST.IfExp;
-import arrr.AST.LambdaExp;
-import arrr.AST.LessExp;
-import arrr.AST.LetExp;
-import arrr.AST.ListExp;
-import arrr.AST.MultExp;
-import arrr.AST.NullExp;
-import arrr.AST.NumExp;
+import arrr.AST.CompoundStatement;
+import arrr.AST.Declaration;
+import arrr.AST.ExternalDeclaration;
+import arrr.AST.ParameterDeclaration;
 import arrr.AST.Program;
-import arrr.AST.ReadExp;
-import arrr.AST.StrExp;
-import arrr.AST.SubExp;
-import arrr.AST.UnitExp;
 import arrr.AST.Visitor;
-import arrr.Env.*;
-import arrr.Type.IntegerType;
-import arrr.Type.StringType;
-import arrr.Type.UnitType;
-import arrr.Type.VoidType;
-import arrr.Value.BoolVal;
-import arrr.Value.DynamicError;
-import arrr.Value.NumVal;
-import arrr.Value.PairVal;
-import arrr.Value.StringVal;
-import arrr.Value.UnitVal;
+import arrr.Environment.*;
+import arrr.Type.*;
 
-public class Evaluator implements Visitor<Value> {
-	
-	Printer.Formatter ts = new Printer.Formatter();
+public class Evaluator implements Visitor<Type> {
 
-	Env initEnv = initialEnv(); //New for definelang
+	// Create the global base environment
+	Environment global_environment = new Environment(null);
 	
-	Value valueOf(Program p) {
-			return (Value) p.accept(this, initEnv);
+	// Build the global environment by evaluating the program
+	Type buildProgramEnvironment(Program p) {
+		return (Type) p.accept(this, global_environment);
 	}
 
-	Value callVessel(){
+	// Invoke the program and execute it!
+	void executeProgram(){
 
-		/* main (vessel) call implementation */
-		try{
-			Value vesselVal = initEnv.get("vessel");
+		// Get the function type object
+		Type func_t =  global_environment.get("vessel");
 
-			if(vesselVal instanceof Value.FunVal){
-
-				CallExp callVessel = new CallExp(new VarExp("vessel"), new ArrayList<Exp>());
-				return (Value) callVessel.accept(this, initEnv);
-			}
-			return new NumVal(-1);
-
-		} catch (Exception e){
-
-			System.out.println("ARRR! There be no seaworthy vessel in this port! (Program is missing entry point \"vessel\")");
-			return new DynamicError(e.getMessage());
+		// Function does not exist
+		if(!(func_t instanceof FunctionType)){
+			throw new RuntimeException("There be no seaworthy ship in the port! (No program entry point)");
 		}
-	}
 
-	@override
-	public T visit(AST.Program e, Env env){
+		FunctionType func = ((FunctionType) func_t);
 
-	}
+		// Wrong number of arguments or wrong return type
+		if(func.params().size() != 0 || !(func.type() instanceof VoidType)){
+			throw new RuntimeException("Entry point invalid");
+		}
 
-	public T visit(AST.FunctionDefinition e, Env env);
-	public T visit(AST.ParameterDeclaration e, Env env);
-	public T visit(AST.CompoundStatement e, Env env);
-	public T visit(AST.VariableDeclaration e, Env env);
-	public T visit(AST.ArrayDeclaration e, Env env);
-	public T visit(AST.Declarator e, Env env);
-	public T visit(AST.NegationExpression p, Env env); // Should always return 1 or 0
-	public T visit(AST.ArrayAccessExpression e, Env env); // Should always return an integer or string
-	public T visit(AST.FunctionCallExpression e, Env env){
-		
-		// TODO:
-		// 1. Find the entry for the variable e.id() in the env chain (function name)
-		// 1.5 Lookup the entry for the function in the global env
-		// 2. Evaluate the parameter declaration list
-		// 3. Find the return type of the function
-		// 4. Create a new env for the compound statement
-		// 5. Evaluate all of the argument expressions, add them as variables to the env using the names and types from the parameter list
-		// 6. Evaluate the compound statement
-		// 7. If the function is void type, return a new VoidType()
-		// 8. If the function is not void type, return a new Type object from a return statement?
-
-		// Get the function name
-		String name = e.id();
+		// Evaluate the body compound statement
+		func.body().accept(this, global_environment);
 	}
 
 	@Override
-	public T visit(AST.EmbeddedFunctionCallExpression e, Env env){
+	public Type visit(AST.Program e, Environment env){
 
-		// Persistent Random class instance
-		static Random rand = null;
+		// Evaluate all external declarations
+		for(ExternalDeclaration decl : e.decls()){
+			decl.accept(this, env);
+		}
+
+		return new UnitType();
+	}
+
+	@Override
+	public Type visit(AST.FunctionDefinition e, Environment env){
+
+		// Retrieve the name of the function
+		String name = e.id();
+
+		// Function name already in use
+		if(!(env.get(name) instanceof UnitType)){
+			throw new RuntimeException("Function definition for " + name + " invalid: Redeclaration of Identifier");
+		}
+
+		// Create the new function type object
+		FunctionType func = new FunctionType(e.type(), e.params(), e.body());
+
+		// Add the function type object to the current (global) environment
+		env.set(name, func);
+
+		return new UnitType();
+	}
+
+	@Override
+	public Type visit(AST.ParameterDeclaration e, Environment env){
+		return new UnitType();
+	}
+
+	@Override
+	public Type visit(AST.CompoundStatement e, Environment env){
+
+		// Evaluate all declarations
+		for(Declaration decl : e.decls()){
+			decl.accept(this, env);
+		}
+
+		// Evaluate all statements
+		for(Statement stmt : e.stmts()){
+
+			// Evaluate the statement
+			Type result = (Type) stmt.accept(this, env);
+
+			// Return statement evaluated, return expression
+			if(!(result instanceof UnitType)){
+				return result;
+			}
+		}
+
+		// All evaluated, return UnitType to indicate end reached without return statement
+		return new UnitType();
+	}
+
+	@Override
+	public Type visit(AST.VariableDeclaration e, Environment env){
+
+		// Retrive the type of the variable
+		Type type = e.type();
+
+		// Retrieve the name of the variable
+		String name = e.id();
+
+		Type init = new UnitType();
+
+		// Retrieve the initializer value
+		if(e.exp() != null){
+
+			// Evaluate the expression
+			init = e.exp().accept(this, env);
+		}
+
+		// Variable name already in use in current scope
+		if(!(env.getCurrent(name) instanceof UnitType)){
+			throw new RuntimeException("Variable declaration for " + name + " invalid: Identifier already in use in current scope");
+		}
+
+		// String variable
+		if(type instanceof StringType){
+
+			if(init instanceof UnitType){ // No initializer
+				init = new StringType("");
+			}
+			else{
+
+				if(init instanceof IntegerType){ // Integer initializer (convert to string)
+					init = new StringType(String.valueOf(((IntegerType) init).val()));
+				}
+				else if(init instanceof StringType){ // String initializer 
+				}
+				else{ // Error
+					throw new RuntimeException("");
+				}
+			}
+		}
+
+		// Integer variable
+		if(type instanceof IntegerType){
+
+			if(init instanceof UnitType){ // No initializer
+				init = new IntegerType(0);
+			}
+			else{
+
+				if(!(init instanceof IntegerType)){
+					throw new RuntimeException("");
+				}
+			}
+		}
+
+		// Invalid variable type
+		if(init instanceof UnitType){
+			throw new RuntimeException("Invalid varible type: " + init.getClass().toString());
+		}
+
+		// Set the variable in the current env
+		env.set(name, init);
+
+		return new UnitType();
+	}
+
+	@Override
+	public Type visit(AST.ArrayDeclaration e, Environment env){
+
+		// Evaluate the array size expression
+		int size = ((IntegerType) e.exp().accept(this, env)).val();
+
+		// Retrieve the element type
+		Type type = e.type();
+
+		// Retrieve the name of the array
+		String name = e.id();
+
+		// Array name already in use in current scope
+		if(!(env.getCurrent(name) instanceof UnitType)){
+			throw new RuntimeException("Array declaration for " + name + " invalid: Identifier already in use in current scope");
+		}
+
+		// String element type
+		if(type instanceof StringType){
+
+			List<Type> list = new ArrayList<Type>(size);
+			for(int i = 0; i < size; i++){
+				list.set(i, new StringType(""));
+			}
+
+			Type arr = new ArrType(new StringType(), list);
+			env.set(name, arr);
+			return new UnitType();
+		}
+
+		// Integer element type
+		if(type instanceof IntegerType){
+
+			List<Type> list = new ArrayList<Type>(size);
+			for(int i = 0; i < size; i++){
+				list.set(i, new IntegerType(0));
+			}
+
+			Type arr = new ArrType(new IntegerType(), list);
+			env.set(name, arr);
+			return new UnitType();
+		}
+
+		// Invalid element type
+		throw new RuntimeException("Invalid Array element type: " + type.getClass().toString());
+	}
+
+	@Override
+	public Type visit(AST.NegationExpression e, Environment env){
+
+		// Evaluate expression to integer
+		int result = ((IntegerType) e.getExp().accept(this, env)).val();
+
+		return new IntegerType(result == 0 ? 1 : 0);
+	}
+
+	@Override
+	public Type visit(AST.ArrayAccessExpression e, Environment env){
+		
+		Type result = env.get(e.id());
+
+		if(result instanceof UnitType){
+			throw new RuntimeException("Undeclared identifier \"" + e.id() + "\"");
+		}
+
+		int idx = ((IntegerType) e.idx().accept(this, env)).val();
+
+		return ((ArrType)result).val().get(idx);
+	}
+
+	@Override
+	public Type visit(AST.FunctionCallExpression e, Environment env){
+
+		// Get the function type object
+		FunctionType func = (FunctionType) env.get(e.id());
+
+		// Wrong number of arguments
+		if(e.args().size() != func.params().size()){
+			throw new RuntimeException("Function call argument mismatch: Expected " + func.params().size() + " but got " + e.args().size());
+		}
+
+		// Create a new environment for the body of the function call
+		Environment body_env = new Environment(env);
+
+		// Evaluate all argument expressions
+		for(int i = 0; i < e.args().size(); i++){
+
+			// Evaluate the argument expression
+			Type result = e.args().get(i).accept(this, env);
+
+			// Convert integer to string type
+			if(func.params().get(i).type() instanceof StringType && result instanceof IntegerType){
+				result = new StringType(String.valueOf(((IntegerType) result).val()));
+			}
+
+			// Argument type mismatch
+			if(result.getClass() != func.params().get(i).type().getClass()){
+				throw new RuntimeException("Function call: mismatch parameter type");
+			}
+
+			// Array element type mismatch
+			if(result instanceof ArrType){
+
+				if(((ArrType) result).type().getClass() 
+					!= ((ArrType) func.params().get(i).type()).type().getClass()){
+						throw new RuntimeException("Function call: mismatch parameter type");
+				}
+			}
+
+			// Add the parameter to the function body environment
+			body_env.set(func.params().get(i).id(), result);
+		}
+
+		// Evaluate the body compound statement
+		Type result = func.body().accept(this, body_env);
+
+		// Void function returned without return statement
+		if(func.type() instanceof VoidType){
+			if(result instanceof UnitType){
+				result = new VoidType();
+			}
+		}
+
+		// Mismatch return type
+		if(result.getClass() != func.type().getClass()){
+			throw new RuntimeException("Function call: mismatch return type");
+		}
+
+		// Mismatch return array element type
+		if(result instanceof ArrType){
+			if(((ArrType) result).type().getClass() != ((ArrType) func.type()).type().getClass()){
+				throw new RuntimeException("Function call: mismatch return type");
+			}
+		}
+
+		return result;
+	}
+
+	@Override
+	public Type visit(AST.EmbeddedFunctionCallExpression e, Environment env){
 
 		// Get the name of the embedded function
 		String name = e.name();
@@ -120,7 +330,7 @@ public class Evaluator implements Visitor<Value> {
 		List<Type> args = new ArrayList<Type>();
 
 		// Evaluate all argument expressions
-		for(Type exp : e.args()){
+		for(Expression exp : e.args()){
 
 			args.add(exp.accept(this, env));
 		}
@@ -130,7 +340,7 @@ public class Evaluator implements Visitor<Value> {
 
 			// Incorrect number of arguments
 			if(args.size() != 2){
-				throw new RuntimeException("yohoho argument number mismatch: expected 2 but got " + args.size().toString());
+				throw new RuntimeException("yohoho argument number mismatch: expected 2 but got " + args.size());
 			}
 
 			// Get the range values
@@ -139,13 +349,11 @@ public class Evaluator implements Visitor<Value> {
 
 			// Invalid range
 			if(start >= stop){
-				throw new RuntimeException("yohoho invalid range: expected at least 1 integer but got [" + start.tostring() + ", " + stop.tostring() + "]");
+				throw new RuntimeException("yohoho invalid range: expected at least 1 integer but got [" + start + ", " + stop + "]");
 			}
 
 			// Create the Random instance
-			if(rand == null){
-				rand = new Random();
-			}
+			Random rand = new Random();
 
 			// Return the new random integer (Does not check bounds)
 			return new IntegerType(start + rand.nextInt((stop - start) + 1));
@@ -156,17 +364,17 @@ public class Evaluator implements Visitor<Value> {
 
 			// Incorrect number of arguments
 			if(args.size() != 1){
-				throw new RuntimeException("stirthebilge argument number mismatch: expected 1 but got " + args.size().toString());
+				throw new RuntimeException("stirthebilge argument number mismatch: expected 1 but got " + args.size());
 			}
 
 			// Get the array (first argument)
-			List<Type> arr = ((ArrayType) args.get(0)).val();
+			List<Type> arr = ((ArrType) args.get(0)).val();
 
 			// Shuffle the array
-			Collections.shuffle(arr, rand);
+			Collections.shuffle(arr);
 
-			// Return the ArrayType object (argument)
-			return (ArrayType) args.get(0);
+			// Return the ArrType object (argument)
+			return (ArrType) args.get(0);
 		}
 
 		// Output
@@ -174,7 +382,7 @@ public class Evaluator implements Visitor<Value> {
 
 			// Incorrect number of arguments
 			if(args.size() != 1){
-				throw new RuntimeException("squawk argument number mismatch: expected 1 but got " + args.size().toString());
+				throw new RuntimeException("squawk argument number mismatch: expected 1 but got " + args.size());
 			}
 
 			// Get the message type (first argument)
@@ -185,7 +393,7 @@ public class Evaluator implements Visitor<Value> {
 
 			// Convert from int to string
 			if(msg_t instanceof IntegerType){
-				msg = ((IntegerType) args.get(0)).val().tostring();
+				msg = String.valueOf(((IntegerType) args.get(0)).val());
 			}
 			else{ // Capture string
 				msg = ((StringType) args.get(0)).val();
@@ -198,15 +406,15 @@ public class Evaluator implements Visitor<Value> {
 			return new StringType(msg);
 		}
 
-		if(name = "avast'ye"){
+		if(name == "avast'ye"){
 
 			// Incorrect number of arguments
 			if(args.size() != 0){
-				throw new RuntimeException("avast'ye argument number mismatch: expected 0 but got " + args.size().toString());
+				throw new RuntimeException("avast'ye argument number mismatch: expected 0 but got " + args.size());
 			}
 
 			// Create an input scannner
-			Scanner scanner = new Scanner(System.in)
+			Scanner scanner = new Scanner(System.in);
 
 			// Read a line of input
 			String input = scanner.nextLine();
@@ -218,27 +426,38 @@ public class Evaluator implements Visitor<Value> {
 			try{
 				return new IntegerType(Integer.parseInt(input));
 			}
-			catch (NumberFormatException e){ // Return as string if else
+			catch (NumberFormatException ecpt){ // Return as string if else
 				return new StringType(input);
 			}
 		}
+
+		return new UnitType();
 	}
 
 	@Override
-	public Type visit(AST.ConstantExpression e, Env env){
+	public Type visit(AST.ConstantExpression e, Environment env){
 		return new IntegerType(e.val());
 	}
 
 	@Override
-	public T visit(AST.StringExpression e, Env env);{
+	public Type visit(AST.StringExpression e, Environment env){
 		return new StringType(e.str());
 	}
 	
 	@Override
-	public T visit(AST.VariableExpression e, Env env);
+	public Type visit(AST.VariableExpression e, Environment env){
+
+		Type result = env.get(e.id());
+
+		if(result instanceof UnitType){
+			throw new RuntimeException("Undeclared identifier \"" + e.id() + "\"");
+		}
+
+		return result;
+	}
 
 	@Override
-	public T visit(AST.MultiplicationExpression e, Env env){
+	public Type visit(AST.MultiplicationExpression e, Environment env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
 		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
@@ -251,7 +470,7 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.DivisionExpression e, Env env){
+	public Type visit(AST.DivisionExpression e, Environment env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
 		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
@@ -264,7 +483,7 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.ModuloExpression e, Env env){
+	public Type visit(AST.ModuloExpression e, Environment env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
 		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
@@ -277,11 +496,11 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.AdditionExpression e, Env env){
+	public Type visit(AST.AdditionExpression e, Environment env){
 
 		// Evaluate the left and right expressions and retrieve types
-		T left_t = e.getRight().accept(this, env);
-		T right_t = e.getRight().accept(this, env);
+		Type left_t = e.getRight().accept(this, env);
+		Type right_t = e.getRight().accept(this, env);
 
 		// Check if either expression is StringType
 		boolean left_is_str = (left_t instanceof StringType);
@@ -290,20 +509,20 @@ public class Evaluator implements Visitor<Value> {
 		// Perform concatenation
 		if(left_is_str || right_is_str){
 
-			String result;
+			String result = "";
 
 			if(left_is_str){ // Left is string
 				result += ((StringType) left_t).val();
 			}
 			else{
-				result += ((IntegerType) left_t).val().tostring();
+				result += String.valueOf(((IntegerType) left_t).val());
 			}
 
 			if(right_is_str){ // Right is string
 				result += ((StringType) right_t).val();
 			}
 			else{
-				result += ((IntegerType) right_t).val().tostring();
+				result += String.valueOf(((IntegerType) right_t).val());
 			}
 
 			return new StringType(result);
@@ -320,7 +539,7 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.SubtractionExpression e, Env env){
+	public Type visit(AST.SubtractionExpression e, Environment env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
 		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
@@ -333,7 +552,7 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.GreaterthanExpression e, Env env){
+	public Type visit(AST.GreaterthanExpression e, Environment env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
 		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
@@ -343,7 +562,7 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.LessthanExpression e, Env env){
+	public Type visit(AST.LessthanExpression e, Environment env){
 
 		// Evaluate the left and right expressions (Must be IntegerType)
 		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
@@ -353,11 +572,11 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.EqualityExpression e, Env env){
+	public Type visit(AST.EqualityExpression e, Environment env){
 
 		// Evaluate the left and right expressions and retrieve types
-		T left_t = e.getRight().accept(this, env);
-		T right_t = e.getRight().accept(this, env);
+		Type left_t = e.getRight().accept(this, env);
+		Type right_t = e.getRight().accept(this, env);
 
 		// Check if either expression is StringType
 		boolean left_is_str = (left_t instanceof StringType);
@@ -381,11 +600,11 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.InequalityExpression e, Env env){
+	public Type visit(AST.InequalityExpression e, Environment env){
 
 		// Evaluate the left and right expressions and retrieve types
-		T left_t = e.getRight().accept(this, env);
-		T right_t = e.getRight().accept(this, env);
+		Type left_t = e.getRight().accept(this, env);
+		Type right_t = e.getRight().accept(this, env);
 
 		// Check if either expression is StringType
 		boolean left_is_str = (left_t instanceof StringType);
@@ -409,7 +628,7 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.LogicalOrExpression e, Env env){
+	public Type visit(AST.LogicalOrExpression e, Environment env){
 		
 		// Evaluate the left and right expressions (Must be IntegerType)
 		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
@@ -419,7 +638,7 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.LogicalAndExpression e, Env env){
+	public Type visit(AST.LogicalAndExpression e, Environment env){
 		
 		// Evaluate the left and right expressions (Must be IntegerType)
 		int left = ((IntegerType) e.getLeft().accept(this, env)).val();
@@ -429,27 +648,97 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.VariableAssignmentExpression e, Env env){
+	public Type visit(AST.VariableAssignmentExpression e, Environment env){
 
-		//((IntegerType) e.exp().accept(this, env)).val()
-		// 1. Find the entry for the variable e.id() in the env chain
-		// 2. Evaluate the expression with e.exp().accept(this, env).???
-		// 3. Update the entry in the env chain
-		// 4. Return the value of the expression assigned
+		// Get the variable object
+		Type type = env.get(e.id());
+
+		// Variable does not exist
+		if(type instanceof UnitType){
+			throw new RuntimeException("");
+		}
+
+		// Evaluate the expression to assign
+		Type value = e.exp().accept(this, env);
+
+		// Integer variable 
+		if(type instanceof IntegerType){
+
+			if(value instanceof IntegerType){ // Expresison is integer type
+				env.set(e.id(), value);
+				return value;
+			}
+		}
+
+		// String variable
+		else if(type instanceof StringType){
+
+			if(value instanceof IntegerType){ // Expression is integer type
+				String str = String.valueOf(((IntegerType) value).val());
+				value = new StringType(str);
+			}
+
+			if(value instanceof StringType){ // Expression is string type
+				env.set(e.id(), value);
+				return value;
+			}
+		}
+
+		// Array
+		else if(type instanceof ArrType){
+			
+			// Elements are the same type
+			if(((ArrType) type).type().getClass() == ((ArrType) value).type().getClass()){
+
+				env.set(e.id(), value);
+				return value;
+			}
+		}
+
+		// Invalid expression type to be assigned
+		throw new RuntimeException("Invalid variable assignment: Expected type " + type.getClass().getSimpleName() + " but got " + value.getClass().getSimpleName());
 	}
 
 	@Override
-	public T visit(AST.ArrayAssignmentExpression e, Env env){
+	public Type visit(AST.ArrayAssignmentExpression e, Environment env){
 
-		// TODO:
-		// 1. Find the entry for the variable e.id() in the env chain
-		// 2. Evaluate the expression with e.exp().accept(this, env).???
-		// 3. Update the entry in the env chain (at the specified index)
-		// 4. Return the value of the expression assigned
+		// Get the Array object
+		ArrType arr = (ArrType) env.get(e.id());
+
+		// Evaluate the index expression
+		int idx = ((IntegerType) e.idx().accept(this, env)).val();
+	
+		// Evaluate the expression to assign
+		Type value = e.exp().accept(this, env);
+
+		// Integer element array
+		if(arr.type() instanceof IntegerType){
+
+			if(value instanceof IntegerType){ // Expression is integer type
+				arr.setIdx(idx, value);
+				return value;
+			}
+		}
+
+		// String element array
+		else if(arr.type() instanceof StringType){
+
+			if(value instanceof IntegerType){ // Expression is integer type
+				String str = String.valueOf(((IntegerType) value).val());
+				value = new StringType(str);
+			}
+
+			if(value instanceof StringType){ // Expression is string type
+				arr.setIdx(idx, value);
+				return value;
+			}
+		}
+
+		return new UnitType();
 	}
 
 	@Override
-	public T visit(AST.ExpressionStatement e, Env env){
+	public Type visit(AST.ExpressionStatement e, Environment env){
 
 		// Evaluate the expression
 		e.exp().accept(this, env);
@@ -459,39 +748,62 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.SelectionStatement e, Env env){
+	public Type visit(AST.SelectionStatement e, Environment env){
 		
-		// TODO:
 		// Evaluate the condition expression
 		int cond = ((IntegerType) e.cond().accept(this, env)).val();
 
 		// Check the condition
 		if(cond != 0){
 
-			// Create a new env for the compound statement
-			// Run the compound statement tbody()
+			// Create a new environment with the current as its parent
+			Environment tbody_env = new Environment(env);
+
+			// Evaluate the body compound statement
+			Type result = (Type) e.tbody().accept(this, tbody_env);
+
+			// Return statement evaluated
+			if(!(result instanceof UnitType)){
+				throw new RuntimeException("selection statement: Invalid return statement");
+			}
+			
 		}
 		else if(e.fbody() != null){
 
-			// Create a new env for the compound statement
-			// Run the compound statement fbody()
+			// Create a new environment with the current as its parent
+			Environment fbody_env = new Environment(env);
+
+			// Evaluate the body compound statement
+			Type result = (Type) e.fbody().accept(this, fbody_env);
+
+			// Return statement evaluated
+			if(!(result instanceof UnitType)){
+				throw new RuntimeException("selection statement: Invalid return statement");
+			}
 		}
 
 		return new UnitType();
 	}
 
 	@Override
-	public T visit(AST.ConditionalLoopStatement e, Env env){
+	public Type visit(AST.ConditionalLoopStatement e, Environment env){
 
-		// TODO:
 		// Evaluate the condition expression
 		int cond = ((IntegerType) e.cond().accept(this, env)).val();
 
 		// Check the condition, run until it fails
 		while(cond != 0){
 
-			// Create a new env for the compound statement
-			// Run the compound statement tbody()
+			// Create a new environment with the current as its parent
+			Environment body_env = new Environment(env);
+
+			// Evaluate the body compound statement
+			Type result = (Type) e.body().accept(this, body_env);
+
+			// Return statement evaluated
+			if(!(result instanceof UnitType)){
+				throw new RuntimeException("conditional loop: Invalid return statement");
+			}
 
 			// Check the condition again
 			cond = ((IntegerType) e.cond().accept(this, env)).val();
@@ -501,33 +813,54 @@ public class Evaluator implements Visitor<Value> {
 	}
 
 	@Override
-	public T visit(AST.IterativeLoopStatement e, Env env){
+	public Type visit(AST.IterativeLoopStatement e, Environment env){
 
-		// TODO:
+		int inf = 0; // Infinite loop, condition expression is null
+		int cond = 0;
+
 		// Evaluate the initial expression
-		e.init().accept(this, env)
+		if(e.init() != null){
+			e.init().accept(this, env);
+		}
 
 		// Evaluate the condition expression
-		int cond = ((IntegerType) e.cond().accept(this, env)).val();
+		if(e.cond() != null){
+			cond = ((IntegerType) e.cond().accept(this, env)).val();
+		}
+		else{
+			inf = 1;
+		}
 
 		// Check the condition, run until it fails
-		while(cond != 0){
+		while(cond != 0 || inf != 0){
 
-			// Create a new env for the compound statement
-			// Run the compound statement tbody()
+			// Create a new environment with the current as its parent
+			Environment body_env = new Environment(env);
+
+			// Evaluate the body compound statement
+			Type result = (Type) e.body().accept(this, body_env);
+
+			// Return statement evaluated
+			if(!(result instanceof UnitType)){
+				throw new RuntimeException("iterative conditional loop: Invalid return statement");
+			}
 
 			// Evaluate the increment expression
-			e.incr().accept(this, env)
+			if(e.incr() != null){
+				e.incr().accept(this, env);
+			}
 
 			// Evaluate the condition again
-			cond = ((IntegerType) e.cond().accept(this, env)).val();
+			if(inf == 0){
+				cond = ((IntegerType) e.cond().accept(this, env)).val();
+			}
 		}
 
 		return new UnitType();
 	}
 
 	@Override
-	public T visit(AST.ReturnStatement e, Env env){
+	public Type visit(AST.ReturnStatement e, Environment env){
 		
 		// If an expression is provided in the return statement, return it
 		if(e.exp() != null){
@@ -537,268 +870,5 @@ public class Evaluator implements Visitor<Value> {
 		
 		// Otherwise, return a void type
 		return new VoidType();
-	}
-	
-	@Override
-	public Value visit(AddExp e, Env env) {
-		List<Exp> operands = e.all();
-		double result = 0;
-		for(Exp exp: operands) {
-			NumVal intermediate = (NumVal) exp.accept(this, env); // Dynamic type-checking
-			result += intermediate.v(); //Semantics of AddExp in terms of the target language.
-		}
-		return new NumVal(result);
-	}
-	
-	@Override
-	public Value visit(UnitExp e, Env env) {
-		return new UnitVal();
-	}
-
-	@Override
-	public Value visit(NumExp e, Env env) {
-		return new NumVal(e.v());
-	}
-
-	@Override
-	public Value visit(StrExp e, Env env) {
-		return new StringVal(e.v());
-	}
-
-	@Override
-	public Value visit(BoolExp e, Env env) {
-		return new BoolVal(e.v());
-	}
-
-	@Override
-	public Value visit(DivExp e, Env env) {
-		List<Exp> operands = e.all();
-		NumVal lVal = (NumVal) operands.get(0).accept(this, env);
-		double result = lVal.v(); 
-		for(int i=1; i<operands.size(); i++) {
-			NumVal rVal = (NumVal) operands.get(i).accept(this, env);
-			result = result / rVal.v();
-		}
-		return new NumVal(result);
-	}
-
-	@Override
-	public Value visit(MultExp e, Env env) {
-		List<Exp> operands = e.all();
-		double result = 1;
-		for(Exp exp: operands) {
-			NumVal intermediate = (NumVal) exp.accept(this, env); // Dynamic type-checking
-			result *= intermediate.v(); //Semantics of MultExp.
-		}
-		return new NumVal(result);
-	}
-
-	@Override
-	public Value visit(Program p, Env env) {
-
-		try {
-			for(DefineDecl d: p.decls())
-				d.accept(this, initEnv);
-			
-			return (Value) p.e().accept(this, initEnv);
-
-		} catch (ClassCastException e) {
-			return new DynamicError(e.getMessage());
-		}
-	}
-
-	@Override
-	public Value visit(SubExp e, Env env) {
-		List<Exp> operands = e.all();
-		NumVal lVal = (NumVal) operands.get(0).accept(this, env);
-		double result = lVal.v();
-		for(int i=1; i<operands.size(); i++) {
-			NumVal rVal = (NumVal) operands.get(i).accept(this, env);
-			result = result - rVal.v();
-		}
-		return new NumVal(result);
-	}
-
-	@Override
-	public Value visit(VarExp e, Env env) {
-		// Previously, all variables had value 42. New semantics.
-		return env.get(e.name());
-	}	
-
-	@Override
-	public Value visit(LetExp e, Env env) { // New for varlang.
-		List<String> names = e.names();
-		List<Exp> value_exps = e.value_exps();
-		List<Value> values = new ArrayList<Value>(value_exps.size());
-		
-		for(Exp exp : value_exps) 
-			values.add((Value)exp.accept(this, env));
-		
-		Env new_env = env;
-		for (int index = 0; index < names.size(); index++)
-			new_env = new ExtendEnv(new_env, names.get(index), values.get(index));
-
-		return (Value) e.body().accept(this, new_env);		
-	}	
-	
-	@Override
-	public Value visit(DefineDecl e, Env env) { // New for definelang.
-		String name = e.name();
-		Exp value_exp = e.value_exp();
-		Value value = (Value) value_exp.accept(this, env);
-		((GlobalEnv) initEnv).extend(name, value);
-		return new Value.UnitVal();		
-	}	
-
-	@Override
-	public Value visit(LambdaExp e, Env env) {
-        // Create a function value with three components:
-		//  1. formal parameters of the function - e.formals()
-		//  2. actual body of the function - e.body()
-		//  3. mapping from the free variables in the function body to their values.
-		return new Value.FunVal(env, e.formals(), e.body());
-	}
-	
-	@Override
-	public Value visit(CallExp e, Env env) {
-		Object result = e.operator().accept(this, env);
-		if(!(result instanceof Value.FunVal))
-			return new Value.DynamicError("Operator not a function in call " +  ts.visit(e, env));
-		Value.FunVal operator =  (Value.FunVal) result; //Dynamic checking
-		List<Exp> operands = e.operands();
-
-		// Call-by-value semantics
-		List<Value> actuals = new ArrayList<Value>(operands.size());
-		for(Exp exp : operands) 
-			actuals.add((Value)exp.accept(this, env));
-		
-		List<String> formals = operator.formals();
- 		if (formals.size()!=actuals.size())
-			return new Value.DynamicError("Argument mismatch in call " + ts.visit(e, env));
-
-		Env fun_env = operator.env();
-		for (int index = 0; index < formals.size(); index++)
-			fun_env = new ExtendEnv(fun_env, formals.get(index), actuals.get(index));
-		
-		return (Value) operator.body().accept(this, fun_env);
-	}
-		
-	@Override
-	public Value visit(IfExp e, Env env) { // New for .
-		Object result = e.conditional().accept(this, env);
-		if(!(result instanceof Value.BoolVal))
-			return new Value.DynamicError("Condition not a boolean in expression " +  ts.visit(e, env));
-		Value.BoolVal condition =  (Value.BoolVal) result; //Dynamic checking
-		
-		if(condition.v())
-			return (Value) e.then_exp().accept(this, env);
-		else return (Value) e.else_exp().accept(this, env);
-	}
-
-	@Override
-	public Value visit(LessExp e, Env env) { // New for .
-		Value.NumVal first = (Value.NumVal) e.first_exp().accept(this, env);
-		Value.NumVal second = (Value.NumVal) e.second_exp().accept(this, env);
-		return new Value.BoolVal(first.v() < second.v());
-	}
-	
-	@Override
-	public Value visit(EqualExp e, Env env) { // New for .
-		Value.NumVal first = (Value.NumVal) e.first_exp().accept(this, env);
-		Value.NumVal second = (Value.NumVal) e.second_exp().accept(this, env);
-		return new Value.BoolVal(first.v() == second.v());
-	}
-
-	@Override
-	public Value visit(GreaterExp e, Env env) { // New for .
-		Value.NumVal first = (Value.NumVal) e.first_exp().accept(this, env);
-		Value.NumVal second = (Value.NumVal) e.second_exp().accept(this, env);
-		return new Value.BoolVal(first.v() > second.v());
-	}
-	
-	@Override
-	public Value visit(CarExp e, Env env) { 
-		Value.PairVal pair = (Value.PairVal) e.arg().accept(this, env);
-		return pair.fst();
-	}
-	
-	@Override
-	public Value visit(CdrExp e, Env env) { 
-		Value.PairVal pair = (Value.PairVal) e.arg().accept(this, env);
-		return pair.snd();
-	}
-	
-	@Override
-	public Value visit(ConsExp e, Env env) { 
-		Value first = (Value) e.fst().accept(this, env);
-		Value second = (Value) e.snd().accept(this, env);
-		return new Value.PairVal(first, second);
-	}
-
-	@Override
-	public Value visit(ListExp e, Env env) { // New for .
-		List<Exp> elemExps = e.elems();
-		int length = elemExps.size();
-		if(length == 0)
-			return new Value.Null();
-		
-		//Order of evaluation: left to right e.g. (list (+ 3 4) (+ 5 4)) 
-		Value[] elems = new Value[length];
-		for(int i=0; i<length; i++)
-			elems[i] = (Value) elemExps.get(i).accept(this, env);
-		
-		Value result = new Value.Null();
-		for(int i=length-1; i>=0; i--) 
-			result = new PairVal(elems[i], result);
-		return result;
-	}	
-	
-	@Override
-	public Value visit(NullExp e, Env env) {
-		Value val = (Value) e.arg().accept(this, env);
-		return new BoolVal(val instanceof Value.Null);
-	}
-
-	public Value visit(EvalExp e, Env env) {
-		StringVal programText = (StringVal) e.code().accept(this, env);
-		Program p = _reader.parse();
-		return (Value) p.accept(this, env);
-	}
-
-	public Value visit(ReadExp e, Env env) {
-		StringVal fileName = (StringVal) e.file().accept(this, env);
-		try {
-			String text = Reader.readFile("" + System.getProperty("user.dir") + File.separator + fileName.v());
-			return new StringVal(text);
-		} catch (IOException ex) {
-			return new DynamicError(ex.getMessage());
-		}
-	}
-
-	private Env initialEnv() {
-		GlobalEnv initEnv = new GlobalEnv();
-		
-		/* Procedure: (read <filename>). Following is same as (define read (lambda (file) (read file))) */
-		List<String> formals = new ArrayList<>();
-		formals.add("file");
-		Exp body = new AST.ReadExp(new VarExp("file"));
-		Value.FunVal readFun = new Value.FunVal(initEnv, formals, body);
-		initEnv.extend("read", readFun);
-
-		/* Procedure: (require <filename>). Following is same as (define require (lambda (file) (eval (read file)))) */
-		formals = new ArrayList<>();
-		formals.add("file");
-		body = new EvalExp(new AST.ReadExp(new VarExp("file")));
-		Value.FunVal requireFun = new Value.FunVal(initEnv, formals, body);
-		initEnv.extend("require", requireFun);
-		
-		/* Add new built-in procedures here */ 
-		
-		return initEnv;
-	}
-	
-	Reader _reader; 
-	public Evaluator(Reader reader) {
-		_reader = reader;
 	}
 }

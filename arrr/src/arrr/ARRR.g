@@ -1,4 +1,9 @@
 grammar ARRR;
+
+@header {
+import arrr.Type.*;
+import arrr.Type;
+}
  
  program returns [Program ast]
  		locals [ArrayList<ExternalDeclaration> decls]              // ArrayList to hold external declarations
@@ -15,9 +20,9 @@ externalDeclaration returns [ExternalDeclaration ast] : // An external declarati
 		;
 
 functionDefinition returns [FunctionDefinition ast] :
-		'canon' id=Identifier 'fires' type=containerSpecifier params=parameterTypeList body=compoundStatement
+		'canon' id=Identifier 'fires' cs=containerSpecifier params=parameterTypeList body=compoundStatement
 
-		{ $ast = new FunctionDefinition($id.text, $type.type, $params.ast, $body.ast); }
+		{ $ast = new FunctionDefinition($id.text, $cs.ast, $params.ast, $body.ast); }
 		;
 
 parameterTypeList returns [List<ParameterDeclaration> ast]        // ArrayList of function parameters (0 or more)
@@ -32,19 +37,19 @@ parameterList returns [List<ParameterDeclaration> ast]               // ArrayLis
 		;
 
 parameterDeclaration returns [ParameterDeclaration ast] :         // A function parameter AST
-		type=containerSpecifier id=Identifier                     // Capture the parameter type and name
-		{ $ast = new ParameterDeclaration($type.type, $id.text); } // Create the parameter and return it
+		cs=containerSpecifier id=Identifier                     // Capture the parameter type and name
+		{ $ast = new ParameterDeclaration($cs.ast, $id.text); } // Create the parameter and return it
 		;
 
-containerSpecifier returns [Type type] :                                   // The container type of a function parameter
-		type=typeSpecifier { $type = $type.type; }                          // A variable parameter
-		| 'plank' type=typeSpecifier { $type = new ArrayType($type.type); } // An array parameter
+containerSpecifier returns [Type ast] :                                   // The container type of a function parameter
+		t=typeSpecifier { $ast = $t.ast; }                          // A variable parameter
+		| 'plank' t=typeSpecifier { $ast = new ArrType($t.ast); } // An array parameter
 		;
 
-typeSpecifier returns [Type type] :              // Variable and array types
-		'naught' { $type = new VoidType(); }   // Void type, only valid for function return type
-		| 'tally' { $type = new IntegerType(); }   // Integer type
-		| 'scroll' { $type = new StringType(); } // String type
+typeSpecifier returns [Type ast] :              // Variable and array types
+		'naught' { $ast = new VoidType(); }   // Void type, only valid for function return type
+		| 'tally' { $ast = new IntegerType(); }   // Integer type
+		| 'scroll' { $ast = new StringType(); } // String type
 		;
 
 compoundStatement returns [CompoundStatement ast]                                               // A function, loop, or selection statement body
@@ -59,15 +64,10 @@ compoundStatement returns [CompoundStatement ast]                               
 		;
 
 declaration returns [Declaration ast] :                                                               // A declaration for a variable or an array
-		type=typeSpecifier decl=declarator '!'                                                     // Variable
-		  { $ast = new VariableDeclaration($type.ast, $decl.ast); }
-		| 'plank' exp=expression type=typeSpecifier id=Identifier '!'                                      // Array
-		  { $ast = new PlankDeclaration($exp.ast, $type.ast, $id.text); }
-		;
-
-declarator returns [Declarator ast] :                                    // Variable declaration or initialization
-		id=Identifier  (  'is' exp=expression )?                           // Check if variable has initializer expression
-		{ $ast = new Declarator($id.text, $exp != null ? $exp.ast : null); } // Return with initializer AST if present
+		t=typeSpecifier id=Identifier ( 'is' exp=expression )? '!'                                 // Variable
+		  { $ast = new VariableDeclaration($t.ast, $id.text, $exp.ast); }
+		| 'plank' exp=expression t=typeSpecifier id=Identifier '!'                                 // Array
+		  { $ast = new ArrayDeclaration($exp.ast, $t.ast, $id.text); }
 		;
 
 expressionList returns [List<Expression> ast]              // List of expressions for a function call
@@ -81,9 +81,9 @@ expression returns [Expression ast] :                                           
 		| 'tisnot' exp=expression { $ast = new NegationExpression($exp.ast); }                                                 // Unary operator, negation: !
 		| id=Identifier 'at' idx=expression { $ast = new ArrayAccessExpression($id.text, $idx.ast); }                      // Array element access: [i]
 		| 'fire' id=Identifier ( 'with' args=expressionList )? 
-		  { $ast = FunctionCallExpression($id.text, $args != null ? $args.ast : new ArrayList<Expression>() ); }           // Function call
-		| func=() ( 'with' args=expressionList )?
-		  { $ast = EmbeddedFunctionCallExpression($func.name, $args != null ? $args.ast : new ArrayList<Expression>() ); } // Embedded function
+		  { $ast = new FunctionCallExpression($id.text, $args.ast); }           // Function call
+		| func=embeddedFunctionName ( 'with' args=expressionList )?
+		  { $ast = new EmbeddedFunctionCallExpression($func.name, $args.ast); } // Embedded function
 		| c=constantExpression { $ast = $c.ast; }                                                           // Integer literal: 12345
 		| s=stringExpression { $ast = $s.ast; }                                                               // String literal: "abcdef"
 		| id=Identifier { $ast = new VariableExpression($id.text); }                                                       // Variable access: n
@@ -134,194 +134,14 @@ embeddedFunctionName returns [String name] :
 statement returns [Statement ast] :
 		e=expression '!' { $ast = new ExpressionStatement($e.ast); }                                                                                                                     // Expression statement (assignment, function call, etc)
 		| 'aye' '(' cond=expression ')' tbody=compoundStatement ( 'scurvy' fbody=compoundStatement )?                                                                // If or If/Else
-		  { $ast = new SelectionStatement($cond.ast, $tbody.ast, $fbody != null ? $fbody.ast : null); }
+		  { $ast = new SelectionStatement($cond.ast, $tbody.ast, $fbody.ast); }
 		| 'in\'voyage' '(' cond=expression ')' body=compoundStatement                                                                                             // While loop
 		  { $ast = new ConditionalLoopStatement($cond.ast, $body.ast); }
 		| 'fer\'all' '(' ( init=expression )? '!' ( cond=expression )? '!' ( incr=expression )? ')' body=compoundStatement                                        // For loop
-		  { $ast = new IterativeLoopStatement($init != null ? $init.ast : null, $cond != null ? $cond.ast : null, $incr != null ? $incr.ast : null, $body.ast); }
-		| 'booty' ( e=expression )? '!' {$ast = new ReturnStatement($e != null ? $e.ast : null); }                                                                                                         // Return statement (from function)
+		  { $ast = new IterativeLoopStatement($init.ast, $cond.ast, $incr.ast, $body.ast); }
+		| 'booty' ( e=expression )? '!' {$ast = new ReturnStatement($e.ast); }                                                                                                         // Return statement (from function)
 		;
 
-// BELOW ARE RULES CREATED FOR FuncLang
-
- definedecl returns [DefineDecl ast] :
- 		'(' Define 
- 			id=Identifier
- 			e=exp
- 		')' { $ast = new DefineDecl($id.text, $e.ast); }
- 		;
-
- exp returns [Exp ast]: 
-		va=varexp { $ast = $va.ast; }
-		| num=numexp { $ast = $num.ast; }
-		| str=strexp { $ast = $str.ast; }
-		| bl=boolexp { $ast = $bl.ast; }
-        | add=addexp { $ast = $add.ast; }
-        | sub=subexp { $ast = $sub.ast; }
-        | mul=multexp { $ast = $mul.ast; }
-        | div=divexp { $ast = $div.ast; }
-        | let=letexp { $ast = $let.ast; }
-        | lam=lambdaexp { $ast = $lam.ast; }
-        | call=callexp { $ast = $call.ast; }
-        | i=ifexp { $ast = $i.ast; }
-        | less=lessexp { $ast = $less.ast; }
-        | eq=equalexp { $ast = $eq.ast; }
-        | gt=greaterexp { $ast = $gt.ast; }
-        | car=carexp { $ast = $car.ast; }
-        | cdr=cdrexp { $ast = $cdr.ast; }
-        | cons=consexp { $ast = $cons.ast; }
-        | list=listexp { $ast = $list.ast; }
-        | nl=nullexp { $ast = $nl.ast; }
-        ;
-
- // New Expressions for 
-
- lambdaexp returns [LambdaExp ast] 
-        locals [ArrayList<String> formals ]
- 		@init { $formals = new ArrayList<String>(); } :
- 		'(' Lambda 
- 			'(' (id=Identifier { $formals.add($id.text); } )* ')'
- 			body=exp 
- 		')' { $ast = new LambdaExp($formals, $body.ast); }
- 		;
-
- callexp returns [CallExp ast] 
-        locals [ArrayList<Exp> arguments = new ArrayList<Exp>();  ] :
- 		'(' f=exp 
- 			( e=exp { $arguments.add($e.ast); } )* 
- 		')' { $ast = new CallExp($f.ast,$arguments); }
- 		;
-
- ifexp returns [IfExp ast] :
- 		'(' If 
- 		    e1=exp 
- 			e2=exp 
- 			e3=exp 
- 		')' { $ast = new IfExp($e1.ast,$e2.ast,$e3.ast); }
- 		;
-
- lessexp returns [LessExp ast] :
- 		'(' Less 
- 		    e1=exp 
- 			e2=exp 
- 		')' { $ast = new LessExp($e1.ast,$e2.ast); }
- 		;
-
- equalexp returns [EqualExp ast] :
- 		'(' Equal 
- 		    e1=exp 
- 			e2=exp 
- 		')' { $ast = new EqualExp($e1.ast,$e2.ast); }
- 		;
-
- greaterexp returns [GreaterExp ast] :
- 		'(' Greater 
- 		    e1=exp 
- 			e2=exp 
- 		')' { $ast = new GreaterExp($e1.ast,$e2.ast); }
- 		;
-
-// Expressions related to list
-
- carexp returns [CarExp ast] :
- 		'(' Car 
- 		    e=exp 
- 		')' { $ast = new CarExp($e.ast); }
- 		;
-
- cdrexp returns [CdrExp ast] :
- 		'(' Cdr 
- 		    e=exp 
- 		')' { $ast = new CdrExp($e.ast); }
- 		;
-
- consexp returns [ConsExp ast] :
- 		'(' Cons 
- 		    e1=exp 
- 			e2=exp 
- 		')' { $ast = new ConsExp($e1.ast,$e2.ast); }
- 		;
-
- listexp returns [ListExp ast] 
-        locals [ArrayList<Exp> list]
- 		@init { $list = new ArrayList<Exp>(); } :
- 		'(' List 
- 		    ( e=exp { $list.add($e.ast); } )* 
- 		')' { $ast = new ListExp($list); }
- 		;
-
- nullexp returns [NullExp ast] :
- 		'(' Null 
- 		    e=exp 
- 		')' { $ast = new NullExp($e.ast); }
- 		;
- 
- strexp returns [StrExp ast] :
- 		s=StrLiteral { $ast = new StrExp($s.text); } 
- 		;
-
- boolexp returns [BoolExp ast] :
- 		TrueLiteral { $ast = new BoolExp(true); } 
- 		| FalseLiteral { $ast = new BoolExp(false); } 
- 		;
- 
- // Other Standard Expressions
- 
-  numexp returns [NumExp ast]:
- 		n0=Number { $ast = new NumExp(Integer.parseInt($n0.text)); } 
-  		| '-' n0=Number { $ast = new NumExp(-Integer.parseInt($n0.text)); }
-  		| n0=Number Dot n1=Number { $ast = new NumExp(Double.parseDouble($n0.text+"."+$n1.text)); }
-  		| '-' n0=Number Dot n1=Number { $ast = new NumExp(Double.parseDouble("-" + $n0.text+"."+$n1.text)); }
-  		;		
-
- addexp returns [AddExp ast]
-        locals [ArrayList<Exp> list]
- 		@init { $list = new ArrayList<Exp>(); } :
- 		'(' '+'
- 		    e=exp { $list.add($e.ast); } 
- 		    ( e=exp { $list.add($e.ast); } )+
- 		')' { $ast = new AddExp($list); }
- 		;
-
- subexp returns [SubExp ast]  
-        locals [ArrayList<Exp> list]
- 		@init { $list = new ArrayList<Exp>(); } :
- 		'(' '-'
- 		    e=exp { $list.add($e.ast); } 
- 		    ( e=exp { $list.add($e.ast); } )+ 
- 		')' { $ast = new SubExp($list); }
- 		;
-
- multexp returns [MultExp ast] 
-        locals [ArrayList<Exp> list]
- 		@init { $list = new ArrayList<Exp>(); } :
- 		'(' '*'
- 		    e=exp { $list.add($e.ast); } 
- 		    ( e=exp { $list.add($e.ast); } )+ 
- 		')' { $ast = new MultExp($list); }
- 		;
- 
- divexp returns [DivExp ast] 
-        locals [ArrayList<Exp> list]
- 		@init { $list = new ArrayList<Exp>(); } :
- 		'(' '/'
- 		    e=exp { $list.add($e.ast); } 
- 		    ( e=exp { $list.add($e.ast); } )+ 
- 		')' { $ast = new DivExp($list); }
- 		;
-
- varexp returns [VarExp ast]: 
- 		id=Identifier { $ast = new VarExp($id.text); }
- 		;
-
- letexp  returns [LetExp ast] 
-        locals [ArrayList<String> names, ArrayList<Exp> value_exps]
- 		@init { $names = new ArrayList<String>(); $value_exps = new ArrayList<Exp>(); } :
- 		'(' Let 
- 			'(' ( '(' id=Identifier e=exp ')' { $names.add($id.text); $value_exps.add($e.ast); } )+  ')'
- 			body=exp 
- 			')' { $ast = new LetExp($names, $value_exps, $body.ast); }
- 		;
 
  // Lexical Specification of this Programming Language
  //  - lexical specification rules start with uppercase
@@ -381,6 +201,6 @@ statement returns [Statement ast] :
  Comment :   '/*' .*? '*/' -> skip;
  Line_Comment :   '//' ~[\r\n]* -> skip;
  
- fragment ESCQUOTE : '\\"';
- String :   '"' ( ESCQUOTE | ~('\n'|'\r') )*? '"';
+ fragment ESCAPE : '\\' ('n' | 't' | 'r' | '\\' | '"') ;
+ String : '"' ( ESCAPE | ~('\\' | '"' | '\n' | '\r') )* '"' ;
  	

@@ -1,0 +1,4 @@
+canon vessel fires naught{
+
+    squawk with "Hello World!\n" !
+}

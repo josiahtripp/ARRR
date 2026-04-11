@@ -3,42 +3,46 @@ package arrr;
 import java.util.ArrayList;
 import java.util.List;
 
-import arrr.AST.Exp;
+import arrr.AST.CompoundStatement;
+import arrr.AST.ParameterDeclaration;
+
 
 public interface Type {
 
 	static class FunctionType implements Type {
-		private Env _env;
-		private List<String> _formals;
-		private Exp _body;
-		public FunVal(Env env, List<String> formals, Exp body) {
-			_env = env;
-			_formals = formals;
-			_body = body;
-		}
-		public Env env() { return _env; }
-		public List<String> formals() { return _formals; }
-		public Exp body() { return _body; }
-	    public String tostring() { 
-			String result = "(lambda ( ";
-			for(String formal : _formals) 
-				result += formal + " ";
-			result += ") ";
-			result += _body.accept(new Printer.Formatter(), _env);
-			return result + ")";
-	    }
+		private Type _type; // Return type
+        private List<ParameterDeclaration> _params; // Parameters
+		private CompoundStatement _body; // Function body
+
+        public FunctionType(Type type, List<ParameterDeclaration> params, CompoundStatement body){
+            _type = type;
+            _params = params;
+            _body = body;
+        }
+
+        public Type type(){
+            return _type;
+        }
+
+        public List<ParameterDeclaration> params(){
+            return _params;
+        }
+
+        public CompoundStatement body(){
+            return _body;
+        }
 	}
 
-    static class ArrayType implements Type {
+    static class ArrType implements Type {
         private Type _type;
         private List<Type> _val;
 
-        public ArrayType(Type type) {
-            _type = elementType;
+        public ArrType(Type type) {
+            _type = type;
         }
 
-        public ArrayType(Type type, List<Type> val){
-            _type = elementType;
+        public ArrType(Type type, List<Type> val){
+            _type = type;
             _val = val;
         }
 
@@ -58,7 +62,7 @@ public interface Type {
 	static class IntegerType implements Type {
 	    private int _val;
 
-        public StringType(){}
+        public IntegerType(){}
 
 	    public IntegerType(int val){
             _val = val;
