@@ -7,6 +7,7 @@ import arrr.AST.*;
 public class Interpreter {
 	public static void main(String[] args) {
 		
+		// Create a new reader with the provided filename, exactly 1 argumnet must be passed when executing interpreter
 		Reader reader;
 		if(args.length == 1) {
 			try {

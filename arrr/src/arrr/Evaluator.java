@@ -37,7 +37,7 @@ public class Evaluator implements Visitor<Type> {
 	void executeProgram(){
 
 		// Get the function type object
-		Type func_t =  global_environment.get("vessel");
+		Type func_t =  global_environment.value("vessel");
 
 		// Function does not exist
 		if(!(func_t instanceof FunctionType)){
@@ -48,7 +48,7 @@ public class Evaluator implements Visitor<Type> {
 
 		// Wrong number of arguments or wrong return type
 		if(func.params().size() != 0 || !(func.type() instanceof VoidType)){
-			throw new RuntimeException("Entry point invalid");
+			throw new RuntimeException("Found entry point \"vessel\" with invalid definition");
 		}
 
 		// Evaluate the body compound statement
@@ -72,16 +72,11 @@ public class Evaluator implements Visitor<Type> {
 		// Retrieve the name of the function
 		String name = e.id();
 
-		// Function name already in use
-		if(!(env.get(name) instanceof UnitType)){
-			throw new RuntimeException("Function definition for " + name + " invalid: Redeclaration of Identifier");
-		}
-
 		// Create the new function type object
 		FunctionType func = new FunctionType(e.type(), e.params(), e.body());
 
 		// Add the function type object to the current (global) environment
-		env.set(name, func);
+		env.declare(name, func);
 
 		return new UnitType();
 	}
@@ -121,63 +116,31 @@ public class Evaluator implements Visitor<Type> {
 		// Retrive the type of the variable
 		Type type = e.type();
 
+		// Invalid variable type (not int or string)
+		if(!(type instanceof IntegerType || type instanceof StringType)){
+			throw new RuntimeException("Invalid variable type: \"" + type.getClass().toString() + "\"");
+		}
+
 		// Retrieve the name of the variable
 		String name = e.id();
 
-		Type init = new UnitType();
+		// Declare with default initializer
+		if(e.exp() == null){
 
-		// Retrieve the initializer value
-		if(e.exp() != null){
-
-			// Evaluate the expression
-			init = e.exp().accept(this, env);
+			Type init = Type.castCheck(null, type);
+			env.declare(name, init);
+			
+			return new UnitType();
 		}
 
-		// Variable name already in use in current scope
-		if(!(env.getCurrent(name) instanceof UnitType)){
-			throw new RuntimeException("Variable declaration for " + name + " invalid: Identifier already in use in current scope");
-		}
+		// Evaluate initializer value of variable
+		Type init = e.exp().accept(this, env);
 
-		// String variable
-		if(type instanceof StringType){
+		// Ensure cast to proper type
+		init = Type.castCheck(init, type);
 
-			if(init instanceof UnitType){ // No initializer
-				init = new StringType("");
-			}
-			else{
-
-				if(init instanceof IntegerType){ // Integer initializer (convert to string)
-					init = new StringType(String.valueOf(((IntegerType) init).val()));
-				}
-				else if(init instanceof StringType){ // String initializer 
-				}
-				else{ // Error
-					throw new RuntimeException("");
-				}
-			}
-		}
-
-		// Integer variable
-		if(type instanceof IntegerType){
-
-			if(init instanceof UnitType){ // No initializer
-				init = new IntegerType(0);
-			}
-			else{
-
-				if(!(init instanceof IntegerType)){
-					throw new RuntimeException("");
-				}
-			}
-		}
-
-		// Invalid variable type
-		if(init instanceof UnitType){
-			throw new RuntimeException("Invalid varible type: " + init.getClass().toString());
-		}
-
-		// Set the variable in the current env
-		env.setCurrent(name, init);
+		// Declare with initializer
+		env.declare(name, init);
 
 		return new UnitType();
 	}
@@ -186,7 +149,7 @@ public class Evaluator implements Visitor<Type> {
 	public Type visit(AST.ArrayDeclaration e, Environment env){
 
 		// Evaluate the array size expression
-		int size = ((IntegerType) e.exp().accept(this, env)).val();
+		int size = Type.intValue(e.exp().accept(this, env));
 
 		// Retrieve the element type
 		Type type = e.type();
@@ -194,39 +157,26 @@ public class Evaluator implements Visitor<Type> {
 		// Retrieve the name of the array
 		String name = e.id();
 
-		// Array name already in use in current scope
-		if(!(env.getCurrent(name) instanceof UnitType)){
-			throw new RuntimeException("Array declaration for " + name + " invalid: Identifier already in use in current scope");
-		}
-
-		// String element type
-		if(type instanceof StringType){
-
-			List<Type> list = new ArrayList<Type>();
-			for(int i = 0; i < size; i++){
-				list.add(new StringType(""));
-			}
-
-			Type arr = new ArrType(new StringType(), list);
-			env.set(name, arr);
-			return new UnitType();
-		}
-
-		// Integer element type
-		if(type instanceof IntegerType){
-
-			List<Type> list = new ArrayList<Type>();
-			for(int i = 0; i < size; i++){
-				list.add(new IntegerType(0));
-			}
-
-			Type arr = new ArrType(new IntegerType(), list);
-			env.set(name, arr);
-			return new UnitType();
-		}
-
 		// Invalid element type
-		throw new RuntimeException("Invalid Array element type: " + type.getClass().toString());
+		if(!(type instanceof IntegerType || type instanceof StringType)){
+			throw new RuntimeException("Invalid array type: \"" + type.getClass().toString() + "\"");
+		}
+
+		// Create the list to hold the array elements
+		List<Type> list = new ArrayList<Type>();
+
+		// Fill the array with empty default types
+		for(int i = 0; i < size; i++){
+			list.add(Type.castCheck(null, type));
+		}
+
+		// Create the array type object
+		Type arr = new ArrType(type, list);
+
+		// Declare the array
+		env.declare(name, arr);
+
+		return new UnitType();
 	}
 
 	@Override
@@ -241,22 +191,20 @@ public class Evaluator implements Visitor<Type> {
 	@Override
 	public Type visit(AST.ArrayAccessExpression e, Environment env){
 		
-		Type result = env.get(e.id());
+		// Get the array object
+		ArrType result = (ArrType) env.value(e.id());
 
-		if(result instanceof UnitType){
-			throw new RuntimeException("Undeclared identifier \"" + e.id() + "\"");
-		}
-
+		// Get the index
 		int idx = ((IntegerType) e.idx().accept(this, env)).val();
 
-		return ((ArrType)result).val().get(idx);
+		return result.val().get(idx);
 	}
 
 	@Override
 	public Type visit(AST.FunctionCallExpression e, Environment env){
 
 		// Get the function type object
-		FunctionType func = (FunctionType) global_environment.get(e.id());
+		FunctionType func = (FunctionType) global_environment.value(e.id());
 
 		// Wrong number of arguments
 		if(e.args().size() != func.params().size()){
@@ -292,7 +240,7 @@ public class Evaluator implements Visitor<Type> {
 			}
 
 			// Add the parameter to the function body environment
-			body_env.setCurrent(func.params().get(i).id(), result);
+			body_env.declare(func.params().get(i).id(), result);
 		}
 
 		// Evaluate the body compound statement
@@ -455,14 +403,7 @@ public class Evaluator implements Visitor<Type> {
 	
 	@Override
 	public Type visit(AST.VariableExpression e, Environment env){
-
-		Type result = env.get(e.id());
-
-		if(result instanceof UnitType){
-			throw new RuntimeException("Undeclared identifier \"" + e.id() + "\"");
-		}
-
-		return result;
+		return env.value(e.id());
 	}
 
 	@Override
@@ -659,53 +600,26 @@ public class Evaluator implements Visitor<Type> {
 	@Override
 	public Type visit(AST.VariableAssignmentExpression e, Environment env){
 
-		// Get the variable object
-		Type type = env.get(e.id());
+		// Get the name of the identifier
+		String name = e.id();
 
-		// Variable does not exist
-		if(type instanceof UnitType){
-			throw new RuntimeException("");
-		}
+		// Get the variable object
+		Type present = env.get(e.id());
 
 		// Evaluate the expression to assign
-		Type value = e.exp().accept(this, env);
+		Type update = e.exp().accept(this, env);
 
-		// Integer variable 
-		if(type instanceof IntegerType){
+		// Types do not match
+		if(!Type.match(present, update)){
 
-			if(value instanceof IntegerType){ // Expresison is integer type
-				env.set(e.id(), value);
-				return value;
-			}
+			// Attempt to cast
+			update = Type.castCheck(update, present);
 		}
 
-		// String variable
-		else if(type instanceof StringType){
+		// Assign the expression to the identifier
+		env.assign(name, update);
 
-			if(value instanceof IntegerType){ // Expression is integer type
-				String str = String.valueOf(((IntegerType) value).val());
-				value = new StringType(str);
-			}
-
-			if(value instanceof StringType){ // Expression is string type
-				env.set(e.id(), value);
-				return value;
-			}
-		}
-
-		// Array
-		else if(type instanceof ArrType){
-			
-			// Elements are the same type
-			if(((ArrType) type).type().getClass() == ((ArrType) value).type().getClass()){
-
-				env.set(e.id(), value);
-				return value;
-			}
-		}
-
-		// Invalid expression type to be assigned
-		throw new RuntimeException("Invalid variable assignment: Expected type " + type.getClass().getSimpleName() + " but got " + value.getClass().getSimpleName());
+		return update;
 	}
 
 	@Override
@@ -716,36 +630,20 @@ public class Evaluator implements Visitor<Type> {
 
 		// Evaluate the index expression
 		int idx = ((IntegerType) e.idx().accept(this, env)).val();
-	
+		
+		// Get the array type
+		Type type = arr.type();
+
 		// Evaluate the expression to assign
-		Type value = e.exp().accept(this, env);
+		Type update = e.exp().accept(this, env);
 
-		System.out.println("Value: " + ((IntegerType) value).val() + "\nidx: " + idx);
+		// Cast expression to element type of array
+		update = Type.castCheck(update, type);
 
-		// Integer element array
-		if(arr.type() instanceof IntegerType){
+		// Assign to the index of the array
+		arr.setIdx(idx, update);
 
-			if(value instanceof IntegerType){ // Expression is integer type
-				arr.setIdx(idx, value);
-				return value;
-			}
-		}
-
-		// String element array
-		else if(arr.type() instanceof StringType){
-
-			if(value instanceof IntegerType){ // Expression is integer type
-				String str = String.valueOf(((IntegerType) value).val());
-				value = new StringType(str);
-			}
-
-			if(value instanceof StringType){ // Expression is string type
-				arr.setIdx(idx, value);
-				return value;
-			}
-		}
-
-		return new UnitType();
+		return update;
 	}
 
 	@Override
