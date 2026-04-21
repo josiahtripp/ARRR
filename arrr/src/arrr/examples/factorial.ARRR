@@ -1,0 +1,19 @@
+canon factorial fires tally with tally x
+{
+    aye(x belessthan 1)
+    {
+        booty 1!
+    }
+
+    booty x stack'em (fire factorial with (x forkover 1))!
+}
+
+canon vessel fires naught
+{
+    tally i!
+
+    fer'all(i is 0! i belessthan 11! i is i bestow 1)
+    {
+        squawk with i bestow "! = " bestow (fire factorial with i) bestow "\n"!
+    }
+}

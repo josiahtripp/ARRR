@@ -105,7 +105,7 @@ expression returns [Expression ast] :                                           
 		  { $ast = new EqualityExpression($left.ast, $right.ast); }
 		| left=expression 'benot' right=expression                                                           // Inequality Expression: !=
 		  { $ast = new InequalityExpression($left.ast, $right.ast); }
-		| left=expression 'er' 'n' right=expression                                                               // Logical Or Expression: ||
+		| left=expression 'er' right=expression                                                               // Logical Or Expression: ||
 		  { $ast = new LogicalOrExpression($left.ast, $right.ast); }
 		| left=expression 'n' right=expression                                                               // Logical And Expression: &&
 		  { $ast = new LogicalAndExpression($left.ast, $right.ast); }

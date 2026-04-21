@@ -1,0 +1,7 @@
+canon vessel fires naught
+{
+    squawk with (1 be 1 er 1 be 1) bestow "\n"!
+    squawk with (1 be 1 er 0 be 1) bestow "\n"!
+    squawk with (0 be 1 er 1 be 1) bestow "\n"!
+    squawk with (0 be 1 er 0 be 1) bestow "\n"!
+}
